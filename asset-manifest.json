@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/NRDOperaciones/static/css/main.dcd06d0d.css",
+    "main.js": "/NRDOperaciones/static/js/main.d3b7617b.js",
+    "static/js/453.1a9ea993.chunk.js": "/NRDOperaciones/static/js/453.1a9ea993.chunk.js",
+    "index.html": "/NRDOperaciones/index.html",
+    "main.dcd06d0d.css.map": "/NRDOperaciones/static/css/main.dcd06d0d.css.map",
+    "main.d3b7617b.js.map": "/NRDOperaciones/static/js/main.d3b7617b.js.map",
+    "453.1a9ea993.chunk.js.map": "/NRDOperaciones/static/js/453.1a9ea993.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.dcd06d0d.css",
+    "static/js/main.d3b7617b.js"
+  ]
+}
