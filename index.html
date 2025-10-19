@@ -4,6 +4,280 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>NRD Operaciones</title>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getDatabase, ref, onValue, push, set, update, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCWja3NDganFA2faeVS-NVrlDJnQLBabZA",
+            authDomain: "ordenes-prod.firebaseapp.com",
+            databaseURL: "https://ordenes-prod-default-rtdb.firebaseio.com",
+            projectId: "ordenes-prod",
+            storageBucket: "ordenes-prod.firebasestorage.app",
+            messagingSenderId: "219625501616",
+            appId: "1:219625501616:web:4028f3f6010d819c019c75"
+        };
+        
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const database = getDatabase(app);
+        
+        console.log('🔥 Firebase inicializado');
+        
+        // Variables globales
+        let currentUser = null;
+        let userData = null;
+        
+        // Función para hacer login
+        window.loginWithFirebase = async function(email, password) {
+            try {
+                console.log('🔐 Intentando login con Firebase...');
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                console.log('✅ Login exitoso:', userCredential.user.email);
+                return userCredential.user;
+            } catch (error) {
+                console.error('❌ Error en login:', error);
+                throw error;
+            }
+        };
+        
+        // Función para hacer logout
+        window.logoutWithFirebase = async function() {
+            try {
+                await signOut(auth);
+                console.log('✅ Logout exitoso');
+            } catch (error) {
+                console.error('❌ Error en logout:', error);
+            }
+        };
+        
+        // Función para obtener datos del usuario
+        window.getUserData = function(uid) {
+            return new Promise((resolve, reject) => {
+                const userRef = ref(database, `users/${uid}`);
+                onValue(userRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        resolve(data);
+                    } else {
+                        reject(new Error('Usuario no encontrado'));
+                    }
+                }, { onlyOnce: true });
+            });
+        };
+        
+        // Función para obtener órdenes
+        window.getOrdenes = function(callback) {
+            const ordenesRef = ref(database, 'ordenes');
+            onValue(ordenesRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const ordenes = Object.keys(data).map(key => ({
+                        id: key,
+                        ...data[key]
+                    }));
+                    callback(ordenes);
+                } else {
+                    callback([]);
+                }
+            });
+        };
+        
+        // Función para obtener tareas
+        window.getTareas = function(callback) {
+            const tareasRef = ref(database, 'tareas');
+            onValue(tareasRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const tareas = Object.keys(data).map(key => ({
+                        id: key,
+                        ...data[key]
+                    }));
+                    callback(tareas);
+                } else {
+                    callback([]);
+                }
+            });
+        };
+        
+        // Función para obtener productos
+        window.getProductos = function(callback) {
+            const productosRef = ref(database, 'productos');
+            onValue(productosRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const productos = Object.keys(data).map(key => ({
+                        id: key,
+                        ...data[key]
+                    }));
+                    callback(productos);
+                } else {
+                    callback([]);
+                }
+            });
+        };
+        
+        // Función para obtener proveedores
+        window.getProveedores = function(callback) {
+            const proveedoresRef = ref(database, 'proveedores');
+            onValue(proveedoresRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const proveedores = Object.keys(data).map(key => ({
+                        id: key,
+                        ...data[key]
+                    }));
+                    callback(proveedores);
+                } else {
+                    callback([]);
+                }
+            });
+        };
+        
+        // Listener de autenticación
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                console.log('👤 Usuario autenticado:', user.email);
+                currentUser = user;
+                try {
+                    userData = await getUserData(user.uid);
+                    console.log('👤 Datos del usuario:', userData);
+                    updateUI();
+                } catch (error) {
+                    console.error('❌ Error obteniendo datos del usuario:', error);
+                }
+            } else {
+                console.log('👤 Usuario no autenticado');
+                currentUser = null;
+                userData = null;
+                showLogin();
+            }
+        });
+        
+        // Función para actualizar la UI
+        function updateUI() {
+            if (currentUser && userData) {
+                showDashboard();
+                loadRealData();
+            }
+        }
+        
+        // Función para cargar datos reales
+        function loadRealData() {
+            // Cargar órdenes
+            getOrdenes((ordenes) => {
+                console.log('📋 Órdenes cargadas:', ordenes.length);
+                updateOrdenesSection(ordenes);
+            });
+            
+            // Cargar tareas
+            getTareas((tareas) => {
+                console.log('✅ Tareas cargadas:', tareas.length);
+                updateTareasSection(tareas);
+            });
+            
+            // Cargar productos
+            getProductos((productos) => {
+                console.log('📦 Productos cargados:', productos.length);
+                updateProductosSection(productos);
+            });
+            
+            // Cargar proveedores
+            getProveedores((proveedores) => {
+                console.log('👥 Proveedores cargados:', proveedores.length);
+                updateProveedoresSection(proveedores);
+            });
+        }
+        
+        // Funciones para actualizar secciones
+        function updateOrdenesSection(ordenes) {
+            const ordenesSection = document.getElementById('ordenes');
+            if (ordenesSection) {
+                const ordenesList = ordenesSection.querySelector('.data-list');
+                if (ordenesList) {
+                    ordenesList.innerHTML = ordenes.map(orden => `
+                        <div class="data-item">
+                            <strong>${orden.numero || 'N/A'}</strong> - ${orden.estado || 'Sin estado'}
+                            <br><small>Cliente: ${orden.cliente || 'N/A'}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        
+        function updateTareasSection(tareas) {
+            const tareasSection = document.getElementById('tareas');
+            if (tareasSection) {
+                const tareasList = tareasSection.querySelector('.data-list');
+                if (tareasList) {
+                    tareasList.innerHTML = tareas.map(tarea => `
+                        <div class="data-item">
+                            <strong>${tarea.titulo || 'Sin título'}</strong> - ${tarea.completada ? 'Completada' : 'Pendiente'}
+                            <br><small>${tarea.descripcion || 'Sin descripción'}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        
+        function updateProductosSection(productos) {
+            const productosSection = document.getElementById('productos');
+            if (productosSection) {
+                const productosList = productosSection.querySelector('.data-list');
+                if (productosList) {
+                    productosList.innerHTML = productos.map(producto => `
+                        <div class="data-item">
+                            <strong>${producto.nombre || 'Sin nombre'}</strong> - $${(producto.precio || 0).toFixed(2)}
+                            <br><small>Stock: ${producto.stock || 0} ${producto.unidad || ''}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        
+        function updateProveedoresSection(proveedores) {
+            const proveedoresSection = document.getElementById('proveedores');
+            if (proveedoresSection) {
+                const proveedoresList = proveedoresSection.querySelector('.data-list');
+                if (proveedoresList) {
+                    proveedoresList.innerHTML = proveedores.map(proveedor => `
+                        <div class="data-item">
+                            <strong>${proveedor.nombre || 'Sin nombre'}</strong>
+                            <br><small>${proveedor.celular || ''} - ${proveedor.email || ''}</small>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        
+        // Función para mostrar login
+        function showLogin() {
+            const loginSection = document.getElementById('login');
+            const dashboardSection = document.getElementById('dashboard');
+            
+            if (loginSection) loginSection.classList.remove('hidden');
+            if (dashboardSection) dashboardSection.classList.add('hidden');
+        }
+        
+        // Función para mostrar dashboard
+        function showDashboard() {
+            const loginSection = document.getElementById('login');
+            const dashboardSection = document.getElementById('dashboard');
+            
+            if (loginSection) loginSection.classList.add('hidden');
+            if (dashboardSection) dashboardSection.classList.remove('hidden');
+        }
+        
+        // Hacer funciones globales
+        window.showSection = showSection;
+        window.handleLogin = handleLogin;
+        window.handleLogout = handleLogout;
+    </script>
+    
     <style>
         body {
             margin: 0;
@@ -101,8 +375,29 @@
         .btn:hover {
             background: #218838;
         }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
         .hidden {
             display: none;
+        }
+        .data-list {
+            margin-top: 1rem;
+        }
+        .data-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+        .user-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
         }
     </style>
 </head>
@@ -121,6 +416,7 @@
             <a href="#" onclick="showSection('ordenes')">Órdenes</a>
             <a href="#" onclick="showSection('tareas')">Tareas</a>
             <a href="#" onclick="showSection('productos')">Productos</a>
+            <a href="#" onclick="showSection('proveedores')">Proveedores</a>
         </nav>
 
         <!-- Login Section -->
@@ -148,65 +444,78 @@
 
         <!-- Dashboard Section -->
         <div id="dashboard" class="content hidden">
+            <div class="user-info">
+                <h3>👤 Usuario Conectado</h3>
+                <p id="user-info">Cargando información del usuario...</p>
+                <button onclick="handleLogout()" class="btn btn-danger">Cerrar Sesión</button>
+            </div>
+            
             <h2>Dashboard</h2>
             <div class="stats">
                 <div class="stat-card">
-                    <div class="stat-number">12</div>
+                    <div class="stat-number" id="ordenes-count">-</div>
                     <div>Órdenes Activas</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">8</div>
+                    <div class="stat-number" id="tareas-count">-</div>
                     <div>Tareas Pendientes</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">45</div>
+                    <div class="stat-number" id="productos-count">-</div>
                     <div>Productos Activos</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">23</div>
-                    <div>Contactos</div>
+                    <div class="stat-number" id="proveedores-count">-</div>
+                    <div>Proveedores</div>
                 </div>
             </div>
             <div style="text-align: center;">
                 <h3>Funcionalidades Disponibles</h3>
-                <p>✅ Gestión de Órdenes</p>
-                <p>✅ Gestión de Tareas</p>
-                <p>✅ Catálogo de Productos</p>
-                <p>✅ Base de Datos de Contactos</p>
+                <p>✅ Gestión de Órdenes (Datos reales de Firebase)</p>
+                <p>✅ Gestión de Tareas (Datos reales de Firebase)</p>
+                <p>✅ Catálogo de Productos (Datos reales de Firebase)</p>
+                <p>✅ Base de Datos de Contactos (Datos reales de Firebase)</p>
             </div>
         </div>
 
         <!-- Other Sections -->
         <div id="ordenes" class="content hidden">
             <h2>Órdenes</h2>
-            <p>Gestión de órdenes de trabajo</p>
-            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
-                <h3>Órdenes Recientes</h3>
-                <p>• Orden #001 - En Proceso</p>
-                <p>• Orden #002 - Pendiente</p>
-                <p>• Orden #003 - Completada</p>
+            <p>Gestión de órdenes de trabajo (Datos reales de Firebase)</p>
+            <div class="data-list">
+                <div class="data-item">
+                    <strong>Cargando órdenes...</strong>
+                </div>
             </div>
         </div>
 
         <div id="tareas" class="content hidden">
             <h2>Tareas</h2>
-            <p>Gestión de tareas</p>
-            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
-                <h3>Tareas Pendientes</h3>
-                <p>• Revisar inventario</p>
-                <p>• Contactar proveedor</p>
-                <p>• Actualizar precios</p>
+            <p>Gestión de tareas (Datos reales de Firebase)</p>
+            <div class="data-list">
+                <div class="data-item">
+                    <strong>Cargando tareas...</strong>
+                </div>
             </div>
         </div>
 
         <div id="productos" class="content hidden">
             <h2>Productos</h2>
-            <p>Catálogo de productos</p>
-            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
-                <h3>Productos Destacados</h3>
-                <p>• Producto A - $100</p>
-                <p>• Producto B - $150</p>
-                <p>• Producto C - $200</p>
+            <p>Catálogo de productos (Datos reales de Firebase)</p>
+            <div class="data-list">
+                <div class="data-item">
+                    <strong>Cargando productos...</strong>
+                </div>
+            </div>
+        </div>
+
+        <div id="proveedores" class="content hidden">
+            <h2>Proveedores</h2>
+            <p>Base de datos de proveedores (Datos reales de Firebase)</p>
+            <div class="data-list">
+                <div class="data-item">
+                    <strong>Cargando proveedores...</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -230,22 +539,29 @@
             console.log('📱 Navegando a:', sectionId);
         }
         
-        function handleLogin(event) {
+        async function handleLogin(event) {
             event.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
             console.log('🔐 Intentando login con:', email);
             
-            // Simular login
-            if (email === 'admin@nrd.com' && password === 'admin123') {
-                alert('✅ Login exitoso como Administrador');
-                showSection('dashboard');
-            } else if (email === 'productor@nrd.com' && password === 'productor123') {
-                alert('✅ Login exitoso como Productor');
-                showSection('dashboard');
-            } else {
-                alert('❌ Credenciales incorrectas');
+            try {
+                await loginWithFirebase(email, password);
+                alert('✅ Login exitoso');
+            } catch (error) {
+                console.error('❌ Error en login:', error);
+                alert('❌ Error en login: ' + error.message);
+            }
+        }
+        
+        async function handleLogout() {
+            try {
+                await logoutWithFirebase();
+                alert('✅ Sesión cerrada');
+            } catch (error) {
+                console.error('❌ Error en logout:', error);
+                alert('❌ Error cerrando sesión');
             }
         }
         
