@@ -1,43 +1,96 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
-
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RestrictedAccess from '../../components/RestrictedAccess';
+import { useUser } from '../../components/UserContext';
+import { Colors } from '../../constants/Colors';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
+  
+  // Usar useUser con manejo de errores
+  let userData = null;
+  try {
+    const userContext = useUser();
+    userData = userContext.userData;
+  } catch (error) {
+    console.warn('⚠️ TabLayout: UserContext no disponible aún, esperando...');
+    // Si el contexto no está disponible, mostrar loading o retornar null
+    return null;
+  }
+
+  // Si el usuario no tiene rol definido, mostrar pantalla de acceso restringido
+  if (userData && !userData.role) {
+    return <RestrictedAccess />;
+  }
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+        tabBarActiveTintColor: '#fff',
+        tabBarInactiveTintColor: '#ffb3b3',
+        tabBarStyle: {
+          backgroundColor: Colors.tint,
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+          paddingBottom: insets.bottom,
+          height: 60 + insets.bottom,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: 'bold',
+          marginBottom: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Inicio',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="ordenes"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Órdenes',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="productos"
+        options={{
+          title: 'Productos',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cube" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="costos"
+        options={{
+          title: 'Costos',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calculator" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="contactos"
+        options={{
+          title: 'Contactos',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

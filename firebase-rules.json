@@ -1,0 +1,30 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "fcm_tokens": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+    "users": {
+      ".indexOn": ["role", "contactId", "email"]
+    },
+    "ordenes": {
+      ".indexOn": ["fecha", "estado", "proveedorId", "createdAt", "updatedAt"]
+    },
+    "proveedores": {
+      ".indexOn": ["nombre", "tipo", "frecuencia/tipo", "createdAt", "updatedAt"]
+    },
+    "productos": {
+      ".indexOn": ["nombre", "proveedorId", "archivado", "orden", "precio", "stock", "createdAt", "updatedAt"]
+    },
+    "eventos": {
+      ".indexOn": ["tipo", "usuario", "fecha", "createdAt"]
+    },
+    "tareas": {
+      ".indexOn": ["asignadaA", "completada", "prioridad", "publica", "seguidores", "createdAt", "updatedAt"]
+    }
+  }
+}

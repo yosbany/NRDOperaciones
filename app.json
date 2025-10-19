@@ -1,22 +1,26 @@
 {
   "expo": {
-    "name": "PurchaseOrdersAppExpo",
-    "slug": "PurchaseOrdersAppExpo",
-    "version": "1.0.0",
+    "name": "NRD Operaciones",
+    "slug": "nrd-operaciones",
+    "version": "1.0.32",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "purchaseordersappexpo",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "bundleIdentifier": "com.nrd.operaciones"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nrd.operaciones",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -33,10 +37,28 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#D7263D",
+          "sounds": [
+            "./assets/notification_sound.wav"
+          ]
+        }
+      ],
+      "@react-native-firebase/app"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "90da0b8b-304d-4ce3-8700-b8100be1eee3"
+      }
     }
   }
 }

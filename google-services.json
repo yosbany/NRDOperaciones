@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "219625501616",
+    "firebase_url": "https://ordenes-prod-default-rtdb.firebaseio.com",
+    "project_id": "ordenes-prod",
+    "storage_bucket": "ordenes-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:219625501616:android:be94621d8e5a2c3b019c75",
+        "android_client_info": {
+          "package_name": "com.nrd.ordenes"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-T2G5jS84yjQ32-2tqU57m0cLALU71aA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
