@@ -85,11 +85,11 @@ export interface Proveedor {
   };
   tipo?: string;
   salarioPorDia?: number;
-  productosDefault?: Array<{
+  productosDefault?: {
     productoId: string;
     cantidad: string;
     unidad: string;
-  }>; // Lista de productos predeterminados para clientes
+  }[]; // Lista de productos predeterminados para clientes
   createdAt: string;
   updatedAt: string;
 }
@@ -1726,7 +1726,7 @@ export const notifyNewTaskToUser = async (targetUserId: string, tarea: Tarea): P
  * @param clienteId - ID del cliente
  * @returns Array de productos con cantidades y unidades predeterminadas
  */
-export const getProductosDefaultCliente = async (clienteId: string): Promise<Array<{ productoId: string; cantidad: string; unidad: string }>> => {
+export const getProductosDefaultCliente = async (clienteId: string): Promise<{ productoId: string; cantidad: string; unidad: string }[]> => {
   try {
     const proveedorSnapshot = await get(ref(database, `proveedores/${clienteId}`));
     const proveedor = proveedorSnapshot.val() as Proveedor;
@@ -1749,7 +1749,7 @@ export const getProductosDefaultCliente = async (clienteId: string): Promise<Arr
  */
 export const updateProductosDefaultCliente = async (
   clienteId: string, 
-  productos: Array<{ productoId: string; cantidad: string; unidad: string }>
+  productos: { productoId: string; cantidad: string; unidad: string }[]
 ): Promise<void> => {
   try {
     const proveedorRef = ref(database, `proveedores/${clienteId}`);
@@ -1772,7 +1772,7 @@ export const updateProductosDefaultCliente = async (
 const calcularCantidadesTotalesDelDia = async (
   productorId: string, 
   fecha: string
-): Promise<Array<{ producto: Producto; cantidad: string; unidad: string }>> => {
+): Promise<{ producto: Producto; cantidad: string; unidad: string }[]> => {
   try {
     console.log(`📊 Calculando cantidades totales del día para productor: ${productorId}, fecha: ${fecha}`);
     
@@ -1950,7 +1950,7 @@ export const generarOrdenesProduccion = async (ordenCliente: Orden): Promise<voi
     console.log(`📊 Total productos únicos procesados: ${Object.keys(productosTotales).length}`);
     
     // PASO 3: Agrupar productos por productor
-    const productosPorProductor: Record<string, { proveedor: Proveedor; productos: Array<{ producto: Producto; cantidad: string; unidad: string }> }> = {};
+    const productosPorProductor: Record<string, { proveedor: Proveedor; productos: { producto: Producto; cantidad: string; unidad: string }[] }> = {};
     
     for (const [productoId, { producto, cantidad, unidad }] of Object.entries(productosTotales)) {
       const productor = proveedores.find(p => p.id === producto.proveedorId && p.tipo === 'Productor');
@@ -2096,7 +2096,7 @@ export const actualizarOrdenesProduccion = async (ordenCliente: Orden): Promise<
  */
 const crearOActualizarOrdenProduccion = async (
   productor: Proveedor,
-  productos: Array<{ producto: Producto; cantidad: string; unidad: string }>,
+  productos: { producto: Producto; cantidad: string; unidad: string }[],
   fechaProduccion: string,
   observaciones: string
 ): Promise<void> => {
@@ -2158,7 +2158,7 @@ const crearOActualizarOrdenProduccion = async (
  */
 const reemplazarOrdenAutomatica = async (
   ordenExistente: Orden,
-  productosNuevos: Array<{ producto: Producto; cantidad: string; unidad: string }>
+  productosNuevos: { producto: Producto; cantidad: string; unidad: string }[]
 ): Promise<void> => {
   try {
     console.log(`🔄 Reemplazando orden automática: ${ordenExistente.id}`);
@@ -2205,7 +2205,7 @@ const reemplazarOrdenAutomatica = async (
  */
 const actualizarOrdenExistente = async (
   ordenExistente: Orden,
-  nuevosProductos: Array<{ producto: Producto; cantidad: string; unidad: string }>
+  nuevosProductos: { producto: Producto; cantidad: string; unidad: string }[]
 ): Promise<void> => {
   try {
     // Combinar productos existentes con nuevos productos
@@ -2265,7 +2265,7 @@ const actualizarOrdenExistente = async (
  */
 const crearNuevaOrdenProduccion = async (
   productor: Proveedor,
-  productos: Array<{ producto: Producto; cantidad: string; unidad: string }>,
+  productos: { producto: Producto; cantidad: string; unidad: string }[],
   fechaProduccion: string,
   observaciones: string
 ): Promise<void> => {
@@ -2352,13 +2352,13 @@ export const generarSugerenciasOrden = (
   proveedorId: string, 
   ordenes: Orden[], 
   productos: Producto[]
-): Array<{ 
+): { 
   producto: Producto; 
   cantidadSugerida: number; 
   unidadSugerida: string;
   promedioCalculado: number;
   ordenesAnalizadas: number;
-}> => {
+}[] => {
   try {
     // Obtener la fecha actual y calcular la semana del mes actual
     const fechaActual = new Date();
@@ -2388,12 +2388,12 @@ export const generarSugerenciasOrden = (
     console.log('📋 Órdenes del proveedor encontradas:', ordenesProveedor.length);
 
     // Agrupar productos por ID y semana del mes
-    const historialProductos: Record<string, Array<{
+    const historialProductos: Record<string, {
       cantidad: number;
       unidad: string;
       fecha: string;
       semana: number;
-    }>> = {};
+    }[]> = {};
 
     // Procesar cada orden
     ordenesProveedor.forEach(orden => {
@@ -2425,13 +2425,13 @@ export const generarSugerenciasOrden = (
     });
 
     // Generar sugerencias basadas en el historial
-    const sugerencias: Array<{ 
+    const sugerencias: { 
       producto: Producto; 
       cantidadSugerida: number; 
       unidadSugerida: string;
       promedioCalculado: number;
       ordenesAnalizadas: number;
-    }> = [];
+    }[] = [];
 
     Object.entries(historialProductos).forEach(([productoId, historial]) => {
       // Verificar que tenga al menos 5 órdenes para esta semana

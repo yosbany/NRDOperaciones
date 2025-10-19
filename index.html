@@ -197,30 +197,27 @@
             });
         };
         
-        // Función para obtener proveedores
-        window.getProveedores = function(callback) {
-            const proveedoresRef = ref(database, 'proveedores');
-            onValue(proveedoresRef, (snapshot) => {
-                const data = snapshot.val();
-                console.log('🔍 Datos de proveedores desde Firebase:', data);
-                if (data) {
-                    const proveedores = Object.keys(data).map(key => ({
-                        id: key,
-                        ...data[key]
-                    }));
-                    console.log('📦 Proveedores procesados:', proveedores);
-                    console.log('🔍 IDs de proveedores disponibles:', proveedores.map(p => p.id));
-                    allProveedores = proveedores;
-                    dataCounts.proveedores = proveedores.length;
-                    callback(proveedores);
-                } else {
-                    console.log('❌ No hay datos de proveedores');
-                    allProveedores = [];
-                    dataCounts.proveedores = 0;
-                    callback([]);
-                }
+        // Función para obtener proveedores usando la capa unificada
+        window.getProveedores = async function(callback) {
+            try {
+                // Importar la capa unificada
+                const { webDataAdapter } = await import('./shared/services/webAdapter.js');
+                const proveedores = await webDataAdapter.getProveedores();
+                
+                console.log('📦 Proveedores obtenidos:', proveedores);
+                console.log('🔍 IDs de proveedores disponibles:', proveedores.map(p => p.id));
+                
+                allProveedores = proveedores;
+                dataCounts.proveedores = proveedores.length;
+                callback(proveedores);
                 updateStats();
-            });
+            } catch (error) {
+                console.error('❌ Error obteniendo proveedores:', error);
+                allProveedores = [];
+                dataCounts.proveedores = 0;
+                callback([]);
+                updateStats();
+            }
         };
         
         // Función para buscar proveedor por ID (igual que en la app móvil)
