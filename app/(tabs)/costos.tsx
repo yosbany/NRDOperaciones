@@ -33,7 +33,7 @@ import {
     getRecetaCosto,
     saveRecetaCosto,
     updateProducto,
-} from '../../services/firebase';
+} from '../../services/firebaseUnified';
 
 const UNIDADES_INGREDIENTES = [
   'gr', 'g', 'kg', 'ml', 'l', 'litro', 'unidad', 'pieza', 'cucharada', 'cucharadita', 'taza'

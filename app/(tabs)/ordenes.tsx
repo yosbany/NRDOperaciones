@@ -15,7 +15,7 @@ import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
 import { ESTADOS_ORDEN, ESTADOS_ORDEN_ARRAY } from '../../constants/Ordenes';
 import { ORDENES_TIPOS, ORDENES_TIPOS_ICONS } from '../../constants/OrdenesTipos';
-import { deleteOrden, generarSugerenciasOrden, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, getProveedorNombre, logEvento, Orden, Producto, Proveedor, saveOrden, setupRealtimeNotifications, updateOrden, updateProductosOrdenBatch } from '../../services/firebase';
+import { deleteOrden, generarSugerenciasOrden, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, getProveedorNombre, logEvento, Orden, Producto, Proveedor, saveOrden, setupRealtimeNotifications, updateOrden, updateProductosOrdenBatch } from '../../services/firebaseUnified';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 // Constante para convertir unidades a abreviaturas más cortas

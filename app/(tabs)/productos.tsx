@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabRestrictedAccess from '../../components/TabRestrictedAccess';
 import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
-import { canAccessTab, deleteProducto, getProductos, getProveedores, logEvento, Producto, Proveedor, saveProducto, updateProducto } from '../../services/firebase';
+import { canAccessTab, deleteProducto, getProductos, getProveedores, logEvento, Producto, Proveedor, saveProducto, updateProducto } from '../../services/firebaseUnified';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 const UNIDADES = ["CAJA","FUNDA","PACK","PLANCHA","BOLSA","FRASCO","UNIDAD","KILOGRAMO","CAJON","LITRO"];

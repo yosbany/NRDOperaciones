@@ -13,8 +13,8 @@ import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
 import { APP_CONFIG, USER_ROLES } from '../../constants/Config';
 import { ESTADOS_ORDEN } from '../../constants/Ordenes';
-import { completarTarea as completarTareaFirebase, deleteTarea, getOrdenes, getOrdenesByUserRole, getProductos, getProveedores, getProveedorNombre, getTareasByUserRole, getUsuariosParaAsignacion, logoutFromFirebase, Orden, Producto, Proveedor, reactivarTarea as reactivarTareaFirebase, saveTarea, setupRealtimeNotifications, Tarea, updateOrden, updateTarea } from '../../services/firebase';
-import { auth } from '../../services/firebaseConfig';
+import { completarTarea as completarTareaFirebase, deleteTarea, getOrdenes, getOrdenesByUserRole, getProductos, getProveedores, getProveedorNombre, getTareasByUserRole, getUsuariosParaAsignacion, logout, Orden, Producto, Proveedor, reactivarTarea as reactivarTareaFirebase, saveTarea, setupRealtimeNotifications, Tarea, updateOrden, updateTarea } from '../../services/firebaseUnified';
+import { auth } from '../../shared/services/firebaseConfig';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 // Componente Header
@@ -1917,7 +1917,7 @@ export default function InicioScreen() {
                   await onLogout();
                 } else {
                   console.log('🔄 Usando logoutFromFirebase directamente...');
-                  await logoutFromFirebase();
+                  await logout();
                 }
                 console.log('✅ Sesión cerrada exitosamente desde header');
               } catch (error) {

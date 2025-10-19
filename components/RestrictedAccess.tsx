@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/Colors';
-import { logoutFromFirebase } from '../services/firebase';
+import { logout } from '../services/firebaseUnified';
 import { useUser } from './UserContext';
 
 export default function RestrictedAccess() {
@@ -15,7 +15,7 @@ export default function RestrictedAccess() {
       if (onLogout) {
         await onLogout();
       } else {
-        await logoutFromFirebase();
+        await logout();
       }
       console.log('✅ Sesión cerrada exitosamente');
     } catch (error) {

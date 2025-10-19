@@ -11,8 +11,8 @@ import RestrictedAccess from '../components/RestrictedAccess';
 import SimpleLogin from '../components/SimpleLogin';
 import UserProvider from '../components/UserContext';
 import { clearAuthState, getUserData, hasValidSession, saveAuthState, saveUserData } from '../services/authStorage';
-import { User, diagnosticarUsuario, getUserByUid, loginWithFirebase, logoutFromFirebase, setupFCMForUser } from '../services/firebase';
-import { auth } from '../services/firebaseConfig';
+import { User, diagnosticarUsuario, getUserByUid, loginWithFirebase, logout, setupFCMForUser } from '../services/firebaseUnified';
+import { auth } from '../shared/services/firebaseConfig';
 // Importación condicional de notificaciones para compatibilidad con Expo Go
 let Notifications: any = null;
 try {
@@ -89,7 +89,7 @@ export default function RootLayout() {
           } else {
             console.log('⚠️ Usuario de Firebase Auth no encontrado en base de datos');
             // Limpiar sesión si no hay datos en la base de datos
-            await logoutFromFirebase();
+            await logout();
           }
         } else {
           console.log('📱 No hay usuario autenticado en Firebase Auth');
