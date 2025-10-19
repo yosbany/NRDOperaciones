@@ -1,1 +1,113 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="./favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta name="description" content="Web site created using create-react-app"/><link rel="apple-touch-icon" href="./logo192.png"/><link rel="manifest" href="./manifest.json"/><title>React App</title><script defer="defer" src="./static/js/main.1108c08f.js"></script><link href="./static/css/main.dcd06d0d.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NRD Operaciones</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+        }
+        .test-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 1rem;
+        }
+        .test-button:hover {
+            background: #218838;
+        }
+        .status {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 NRD Operaciones</h1>
+        <p>Página de diagnóstico - Si ves esto, GitHub Pages funciona</p>
+        
+        <div class="status">
+            <h3>Estado del Sistema:</h3>
+            <p>✅ HTML cargado</p>
+            <p>✅ CSS cargado</p>
+            <p id="js-status">⏳ Verificando JavaScript...</p>
+            <p id="react-status">⏳ Verificando React...</p>
+        </div>
+        
+        <button class="test-button" onclick="testJavaScript()">
+            Probar JavaScript
+        </button>
+        
+        <button class="test-button" onclick="testReact()">
+            Probar React
+        </button>
+        
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        console.log('🚀 JavaScript funcionando');
+        document.getElementById('js-status').innerHTML = '✅ JavaScript funcionando';
+        
+        function testJavaScript() {
+            alert('¡JavaScript está funcionando correctamente!');
+            document.getElementById('test-results').innerHTML = 
+                '<div class="status"><h3>✅ JavaScript OK</h3><p>JavaScript está habilitado y funcionando.</p></div>';
+        }
+        
+        function testReact() {
+            console.log('🔍 Verificando React...');
+            
+            // Verificar si React está cargado
+            if (typeof React !== 'undefined') {
+                console.log('✅ React encontrado');
+                document.getElementById('react-status').innerHTML = '✅ React cargado';
+                document.getElementById('test-results').innerHTML = 
+                    '<div class="status"><h3>✅ React OK</h3><p>React está cargado y funcionando.</p></div>';
+            } else {
+                console.log('❌ React no encontrado');
+                document.getElementById('react-status').innerHTML = '❌ React no cargado';
+                document.getElementById('test-results').innerHTML = 
+                    '<div class="status"><h3>❌ React Error</h3><p>React no se está cargando. Verifica la consola para errores.</p></div>';
+            }
+        }
+        
+        // Verificar si los archivos se están cargando
+        fetch('./static/js/main.1108c08f.js')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Archivo JavaScript encontrado');
+                } else {
+                    console.error('❌ Archivo JavaScript no encontrado');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error cargando JavaScript:', error);
+            });
+    </script>
+    
+    <!-- Cargar React -->
+    <script defer src="./static/js/main.1108c08f.js"></script>
+</body>
+</html>
