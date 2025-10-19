@@ -1,50 +1,126 @@
-# Welcome to your Expo app 👋
+# NRD Operaciones 📱
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil para la gestión de operaciones de NRD, desarrollada con React Native y Expo.
 
-## Get started
+## 🚀 Características
 
-1. Install dependencies
+- **Gestión de Órdenes**: Crear, editar y gestionar órdenes de trabajo
+- **Control de Productos**: Administración del catálogo de productos
+- **Gestión de Contactos**: Base de datos de contactos y clientes
+- **Control de Costos**: Seguimiento y análisis de costos operativos
+- **Autenticación**: Sistema de login seguro con Firebase
+- **Notificaciones**: Sistema de notificaciones push
+- **Multiplataforma**: Compatible con Android e iOS
 
+## 🛠️ Tecnologías
+
+- **React Native** con Expo
+- **TypeScript** para tipado estático
+- **Firebase** para backend y autenticación
+- **React Navigation** para navegación
+- **Expo Notifications** para notificaciones push
+
+## 📋 Requisitos Previos
+
+- Node.js (versión 18 o superior)
+- npm o yarn
+- Expo CLI
+- Cuenta de Firebase (para funcionalidades completas)
+
+## 🚀 Instalación
+
+1. **Clonar el repositorio**
+   ```bash
+   git clone https://github.com/yosbany/NRDOperaciones.git
+   cd NRDOperaciones
+   ```
+
+2. **Instalar dependencias**
    ```bash
    npm install
    ```
 
-2. Start the app
+3. **Configurar Firebase**
+   - Copia los archivos de configuración de Firebase:
+     - `google-services.json` (Android)
+     - `GoogleService-Info.plist` (iOS)
 
+4. **Iniciar la aplicación**
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## 📱 Desarrollo
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Opciones de desarrollo:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **Expo Go**: Escanea el código QR con la app Expo Go
+- **Android Emulator**: Ejecuta en emulador de Android Studio
+- **iOS Simulator**: Ejecuta en simulador de iOS (solo macOS)
+- **Development Build**: Build personalizado para testing
 
-## Get a fresh project
+### Estructura del proyecto:
 
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+├── app/                    # Páginas principales (file-based routing)
+├── components/             # Componentes reutilizables
+├── services/               # Servicios (Firebase, notificaciones)
+├── constants/              # Constantes y configuraciones
+├── hooks/                  # Custom hooks
+├── utils/                  # Utilidades y helpers
+└── assets/                 # Recursos (imágenes, sonidos)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🔧 Scripts Disponibles
 
-## Learn more
+```bash
+# Desarrollo
+npm start                   # Inicia el servidor de desarrollo
+npm run android            # Ejecuta en Android
+npm run ios                # Ejecuta en iOS
+npm run web                # Ejecuta en web
 
-To learn more about developing your project with Expo, look at the following resources:
+# Build
+npm run build              # Build para producción
+./build-android.sh         # Build para Android
+./build-google-play.sh     # Build para Google Play Store
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 🔐 Configuración de Firebase
 
-## Join the community
+1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com/)
+2. Habilita Authentication y Realtime Database
+3. Descarga los archivos de configuración
+4. Configura las reglas de seguridad en `firebase-rules.json`
 
-Join our community of developers creating universal apps.
+## 📦 Build para Producción
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Android
+```bash
+./build-android.sh
+```
+
+### Google Play Store
+```bash
+./build-google-play.sh
+```
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+
+## 📞 Soporte
+
+Para soporte técnico o preguntas sobre el proyecto, contacta al equipo de desarrollo.
+
+---
+
+**Desarrollado con ❤️ para NRD Operaciones**

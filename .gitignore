@@ -42,3 +42,49 @@ app-example
 __tests__/config/firebase-production.config.js
 .env.test
 firebase-test-config.json
+
+# Android build files
+android/app/build/
+android/build/
+android/.gradle/
+android/gradle/
+android/local.properties
+
+# iOS build files
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcuserdata
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Firebase keys and sensitive config
+google-services.json
+GoogleService-Info.plist
+firebase-adminsdk-*.json
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+
+# Temporary files
+*.tmp
+*.temp
