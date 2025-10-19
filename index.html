@@ -143,9 +143,9 @@
                     });
                     break;
                 case 'proveedor':
-                    // Filtrar por proveedor (si hay campo proveedor)
+                    // Filtrar por proveedor (si hay campo proveedorId)
                     filteredOrdenes = allOrdenes.filter(orden => {
-                        return orden.proveedorId || orden.proveedor || orden.proveedorNombre;
+                        return orden.proveedorId && allProveedores.find(p => p.id === orden.proveedorId);
                     });
                     break;
                 case 'todas':
@@ -222,20 +222,10 @@
             });
         };
         
-        // Función para buscar proveedor por ID
+        // Función para buscar proveedor por ID (igual que en la app móvil)
         function findProveedorById(proveedorId) {
-            console.log('🔍 Buscando proveedor con ID:', proveedorId);
-            console.log('🔍 Proveedores disponibles:', allProveedores.length);
-            console.log('🔍 IDs de proveedores:', allProveedores.map(p => p.id));
-            
-            if (!proveedorId || !allProveedores.length) {
-                console.log('❌ No hay ID o no hay proveedores');
-                return null;
-            }
-            
-            const proveedor = allProveedores.find(proveedor => proveedor.id === proveedorId);
-            console.log('🔍 Resultado de búsqueda:', proveedor);
-            return proveedor;
+            if (!proveedorId || !allProveedores.length) return null;
+            return allProveedores.find(proveedor => proveedor.id === proveedorId);
         }
         
         // Función para actualizar estadísticas
@@ -365,35 +355,30 @@
                             // Formatear número de orden
                             const numeroOrden = orden.numero || orden.id || 'Sin número';
                             
-                            // Formatear cliente - buscar en proveedores si es un ID
-                            let cliente = orden.cliente || orden.clienteNombre || 'N/A';
+                            // Formatear cliente - buscar en proveedores como en la app móvil
+                            let cliente = 'Proveedor desconocido';
                             
                             // Debug: mostrar datos de la orden
                             console.log('🔍 Orden datos:', {
                                 id: orden.id,
-                                cliente: orden.cliente,
-                                clienteNombre: orden.clienteNombre,
                                 proveedorId: orden.proveedorId,
                                 proveedor: orden.proveedor,
                                 proveedorNombre: orden.proveedorNombre
                             });
                             
-                            // Si el cliente es un ID, buscar en proveedores
-                            if (orden.proveedorId || orden.proveedor) {
-                                const proveedorId = orden.proveedorId || orden.proveedor;
-                                console.log('🔍 Buscando proveedor con ID:', proveedorId);
-                                const proveedor = findProveedorById(proveedorId);
+                            // Buscar proveedor por ID como en la app móvil
+                            if (orden.proveedorId) {
+                                console.log('🔍 Buscando proveedor con ID:', orden.proveedorId);
+                                const proveedor = allProveedores.find(p => p.id === orden.proveedorId);
                                 console.log('🔍 Proveedor encontrado:', proveedor);
                                 if (proveedor) {
-                                    cliente = proveedor.nombre || cliente;
+                                    cliente = proveedor.nombre || 'Proveedor desconocido';
                                     console.log('✅ Cliente resuelto:', cliente);
                                 } else {
-                                    console.log('❌ Proveedor no encontrado para ID:', proveedorId);
+                                    console.log('❌ Proveedor no encontrado para ID:', orden.proveedorId);
                                 }
-                            }
-                            
-                            // También verificar si ya tiene proveedorNombre
-                            if (orden.proveedorNombre && !cliente.includes('N/A')) {
+                            } else if (orden.proveedorNombre) {
+                                // Si ya tiene el nombre del proveedor, usarlo
                                 cliente = orden.proveedorNombre;
                                 console.log('✅ Usando proveedorNombre:', cliente);
                             }
