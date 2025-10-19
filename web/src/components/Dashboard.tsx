@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333' }}>
-                        ${orden.total.toFixed(2)}
+                        ${(orden.total || 0).toFixed(2)}
                       </div>
                     </div>
                   </div>

@@ -115,11 +115,16 @@ const LoginForm: React.FC = () => {
         fontSize: '0.9rem',
         color: '#666'
       }}>
-        <strong>Usuarios de prueba:</strong>
+        <strong>⚠️ Usuarios de prueba:</strong>
+        <br />
+        <strong>Necesitas crear estos usuarios en Firebase Authentication:</strong>
         <br />
         • admin@nrd.com / admin123
         <br />
         • productor@nrd.com / productor123
+        <br />
+        <br />
+        <strong>O usa cualquier email/contraseña que tengas en Firebase Auth</strong>
       </div>
     </div>
   );
