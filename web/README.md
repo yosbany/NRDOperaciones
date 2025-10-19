@@ -1,6 +1,15 @@
-# NRD Operaciones - GitHub Pages
+# NRD Operaciones - Web Documentation
 
-Este directorio contiene la documentación web del proyecto NRD Operaciones, diseñada para ser desplegada en GitHub Pages.
+Esta es la documentación web del proyecto NRD Operaciones, una aplicación React que se despliega en GitHub Pages.
+
+## 🎯 Propósito
+
+Esta aplicación web es **SOLO para documentación** y **NO afecta** la aplicación móvil principal. Es completamente independiente y sirve únicamente para:
+
+- Mostrar información del proyecto
+- Proporcionar documentación
+- Facilitar la instalación y configuración
+- Servir como landing page del repositorio
 
 ## 🚀 Despliegue en GitHub Pages
 
@@ -11,90 +20,115 @@ Este directorio contiene la documentación web del proyecto NRD Operaciones, dis
    - Selecciona "Deploy from a branch"
    - Elige la rama `main` y carpeta `/web`
 
-2. **Acceso a la página**:
+2. **Desplegar automáticamente**:
+   ```bash
+   cd web
+   npm run deploy
+   ```
+
+3. **Acceso a la página**:
    - Tu página estará disponible en: `https://yosbany.github.io/NRDOperaciones/`
 
-### Configuración Manual
-
-Si prefieres configurar manualmente:
+## 🛠️ Desarrollo Local
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/yosbany/NRDOperaciones.git
-cd NRDOperaciones/web
+# Navegar al directorio web
+cd web
 
-# Servir localmente para desarrollo
-python -m http.server 8000
-# o
-npx serve .
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
+npm start
+
+# Construir para producción
+npm run build
 ```
 
-## 📁 Estructura
+## 📁 Estructura del Proyecto
 
 ```
 web/
-├── index.html          # Página principal
-├── README.md          # Este archivo
-└── assets/            # Recursos estáticos (opcional)
+├── public/                 # Archivos estáticos
+├── src/
+│   ├── components/        # Componentes React
+│   │   ├── Header.tsx
+│   │   ├── Hero.tsx
+│   │   ├── Features.tsx
+│   │   ├── Technology.tsx
+│   │   ├── Installation.tsx
+│   │   └── Footer.tsx
+│   ├── pages/            # Páginas de la aplicación
+│   │   ├── About.tsx
+│   │   └── Contact.tsx
+│   ├── App.tsx           # Componente principal
+│   ├── App.css           # Estilos globales
+│   └── index.tsx         # Punto de entrada
+├── package.json          # Dependencias y scripts
+└── README.md            # Este archivo
 ```
 
-## 🎨 Personalización
-
-La página web está construida con:
-- **Bootstrap 5** para el diseño responsivo
-- **Font Awesome** para iconos
-- **CSS personalizado** para efectos visuales
-
-### Modificar el contenido
-
-Edita `index.html` para:
-- Cambiar el texto y descripción
-- Actualizar enlaces
-- Modificar colores y estilos
-- Agregar nuevas secciones
-
-## 🔧 Desarrollo Local
-
-Para desarrollar la página web localmente:
+## 🔧 Scripts Disponibles
 
 ```bash
-# Opción 1: Python
-python -m http.server 8000
-
-# Opción 2: Node.js
-npx serve .
-
-# Opción 3: PHP
-php -S localhost:8000
+npm start          # Servidor de desarrollo
+npm run build      # Construir para producción
+npm run deploy     # Desplegar a GitHub Pages
+npm test           # Ejecutar tests
 ```
 
-Luego visita `http://localhost:8000` en tu navegador.
+## 🎨 Características
 
-## 📱 Características de la Página
-
-- ✅ **Diseño responsivo** - Se adapta a móviles, tablets y desktop
+- ✅ **React 18** con TypeScript
+- ✅ **React Router** para navegación
+- ✅ **Diseño responsivo** - Mobile first
+- ✅ **CSS personalizado** - Sin dependencias externas
+- ✅ **GitHub Pages** - Despliegue automático
 - ✅ **SEO optimizado** - Meta tags y estructura semántica
-- ✅ **Carga rápida** - CDN para Bootstrap y Font Awesome
-- ✅ **Accesible** - Cumple estándares de accesibilidad web
-- ✅ **Moderno** - Diseño actual y profesional
+
+## 🔒 Separación de Proyectos
+
+### Aplicación Móvil (Principal)
+- Ubicación: `/` (raíz del repositorio)
+- Tecnología: React Native + Expo
+- Propósito: Aplicación móvil funcional
+
+### Aplicación Web (Documentación)
+- Ubicación: `/web`
+- Tecnología: React + TypeScript
+- Propósito: Documentación y landing page
+
+**Ambas aplicaciones son completamente independientes y no se afectan entre sí.**
+
+## 📱 Páginas Disponibles
+
+- **Inicio** (`/`) - Landing page con información del proyecto
+- **Acerca de** (`/about`) - Información detallada del proyecto
+- **Contacto** (`/contact`) - Información de contacto y contribución
 
 ## 🔄 Actualizaciones
 
-Para actualizar la página:
-
-1. Modifica los archivos en `/web`
-2. Haz commit y push a la rama `main`
-3. GitHub Pages se actualizará automáticamente
+Para actualizar la documentación web:
 
 ```bash
+# Hacer cambios en los archivos
+# Luego hacer commit y push
 git add web/
-git commit -m "Update GitHub Pages"
+git commit -m "Update web documentation"
 git push origin main
+
+# O desplegar directamente
+cd web
+npm run deploy
 ```
 
 ## 📞 Soporte
 
-Para problemas con la página web, revisa:
-- [GitHub Pages Documentation](https://docs.github.com/en/pages)
-- [Bootstrap Documentation](https://getbootstrap.com/docs/)
-- [Font Awesome Icons](https://fontawesome.com/icons)
+Para problemas con la documentación web:
+- Revisa la consola del navegador
+- Verifica que GitHub Pages esté habilitado
+- Asegúrate de que el build sea exitoso
+
+---
+
+**Nota**: Esta aplicación web es únicamente para documentación y no reemplaza ni afecta la aplicación móvil principal.
