@@ -209,6 +209,7 @@
                         ...data[key]
                     }));
                     console.log('📦 Proveedores procesados:', proveedores);
+                    console.log('🔍 IDs de proveedores disponibles:', proveedores.map(p => p.id));
                     allProveedores = proveedores;
                     dataCounts.proveedores = proveedores.length;
                     callback(proveedores);
@@ -224,8 +225,18 @@
         
         // Función para buscar proveedor por ID (igual que en la app móvil)
         function findProveedorById(proveedorId) {
-            if (!proveedorId || !allProveedores.length) return null;
-            return allProveedores.find(proveedor => proveedor.id === proveedorId);
+            console.log('🔍 findProveedorById - Buscando ID:', proveedorId);
+            console.log('🔍 findProveedorById - Total proveedores:', allProveedores.length);
+            console.log('🔍 findProveedorById - IDs disponibles:', allProveedores.map(p => p.id));
+            
+            if (!proveedorId || !allProveedores.length) {
+                console.log('❌ findProveedorById - No hay ID o no hay proveedores');
+                return null;
+            }
+            
+            const proveedor = allProveedores.find(proveedor => proveedor.id === proveedorId);
+            console.log('🔍 findProveedorById - Resultado:', proveedor);
+            return proveedor;
         }
         
         // Función para actualizar estadísticas
