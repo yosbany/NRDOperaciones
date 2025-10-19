@@ -40,6 +40,8 @@
             productos: 0,
             proveedores: 0
         };
+        let allOrdenes = [];
+        let currentFilter = 'ultimas';
         
         // Función para hacer login
         window.loginWithFirebase = async function(email, password) {
@@ -97,14 +99,59 @@
                         id: key,
                         ...data[key]
                     }));
+                    allOrdenes = ordenes;
                     dataCounts.ordenes = ordenes.length;
                     callback(ordenes);
                 } else {
+                    allOrdenes = [];
                     dataCounts.ordenes = 0;
                     callback([]);
                 }
                 updateStats();
             });
+        };
+        
+        // Función para filtrar órdenes
+        window.filterOrders = function(filter) {
+            currentFilter = filter;
+            
+            // Actualizar tabs activos
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            let filteredOrdenes = [...allOrdenes];
+            
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            switch(filter) {
+                case 'ultimas':
+                    // Mostrar las últimas 10
+                    filteredOrdenes = allOrdenes.slice(0, 10);
+                    break;
+                case 'hoy':
+                    // Filtrar por hoy
+                    filteredOrdenes = allOrdenes.filter(orden => {
+                        if (orden.fecha) {
+                            const ordenDate = new Date(orden.fecha).toISOString().split('T')[0];
+                            return ordenDate === todayStr;
+                        }
+                        return false;
+                    });
+                    break;
+                case 'proveedor':
+                    // Filtrar por proveedor (si hay campo proveedor)
+                    filteredOrdenes = allOrdenes.filter(orden => orden.proveedor || orden.proveedorNombre);
+                    break;
+                case 'todas':
+                    // Mostrar todas
+                    filteredOrdenes = allOrdenes;
+                    break;
+            }
+            
+            updateOrdenesSection(filteredOrdenes);
         };
         
         // Función para obtener tareas
@@ -302,15 +349,27 @@
                             
                             return `
                                 <div class="data-item">
-                                    <div class="data-header">
-                                        <strong>Orden #${numeroOrden}</strong>
-                                        <span class="status-badge status-${estadoClass}">${estado}</span>
+                                    <div class="order-company">${cliente}</div>
+                                    <div class="order-meta">
+                                        <div class="order-meta-item">
+                                            <span>📅</span>
+                                            <span>${fechaFormateada}</span>
+                                        </div>
+                                        <div class="order-meta-item">
+                                            <span>📦</span>
+                                            <span>Ítems: ${orden.productos ? orden.productos.length : 0}</span>
+                                        </div>
+                                        <div class="order-meta-item">
+                                            <span>💰</span>
+                                            <span>$${total.toFixed(2)}</span>
+                                        </div>
                                     </div>
-                                    <div class="data-details">
-                                        <small><strong>Cliente:</strong> ${cliente}</small><br>
-                                        <small><strong>Fecha:</strong> ${fechaFormateada}</small><br>
-                                        <small><strong>Total:</strong> $${total.toFixed(2)}</small>
-                                        ${orden.productos && orden.productos.length > 0 ? `<br><small><strong>Productos:</strong> ${orden.productos.length} items</small>` : ''}
+                                    <div class="data-header">
+                                        <div class="order-meta-item">
+                                            <span>🏷️</span>
+                                            <span>Nueva</span>
+                                        </div>
+                                        <span class="status-badge status-${estadoClass}">${estado}</span>
                                     </div>
                                 </div>
                             `;
@@ -612,55 +671,153 @@
         }
         
         .data-item {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
             padding: 1.5rem;
             margin-bottom: 1rem;
-            border-radius: 8px;
+            border-radius: 12px;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
         }
         
         .data-item:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateX(5px);
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
         }
         
         .data-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
         }
         
         .data-details {
             font-size: 0.9rem;
-            opacity: 0.8;
+            color: #666;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
         }
         
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
+        .data-details small {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+        
+        .data-details small strong {
+            color: #333;
+            margin-right: 0.5rem;
+            min-width: 80px;
+        }
+        
+        .order-company {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .order-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .order-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+        
+        .filter-tab {
+            background: transparent;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
             font-weight: 500;
         }
         
+        .filter-tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .filter-tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
         .status-pendiente {
-            background: #ffc107;
-            color: #000;
+            background: #ff9800;
+            color: white;
+        }
+        
+        .status-pendiente::before {
+            content: "⏰";
         }
         
         .status-en-proceso {
-            background: #17a2b8;
+            background: #2196f3;
             color: white;
+        }
+        
+        .status-enviada, .status-impresa {
+            background: #2196f3;
+            color: white;
+        }
+        
+        .status-enviada::before, .status-impresa::before {
+            content: "🖨️";
         }
         
         .status-completada {
-            background: #28a745;
+            background: #4caf50;
             color: white;
         }
         
+        .status-completada::before {
+            content: "✅";
+        }
+        
         .status-cancelada {
-            background: #dc3545;
+            background: #f44336;
             color: white;
+        }
+        
+        .status-cancelada::before {
+            content: "❌";
         }
         
         .price {
@@ -821,6 +978,15 @@
         <div id="ordenes" class="content hidden">
             <h2>📋 Órdenes</h2>
             <p>Gestión de órdenes de trabajo</p>
+            
+            <!-- Filtros como en la app móvil -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" onclick="filterOrders('ultimas')">Últimas</button>
+                <button class="filter-tab" onclick="filterOrders('hoy')">Hoy</button>
+                <button class="filter-tab" onclick="filterOrders('proveedor')">Proveedor</button>
+                <button class="filter-tab" onclick="filterOrders('todas')">Todas</button>
+            </div>
+            
             <div class="data-list">
                 <div class="data-item">
                     <strong>Cargando órdenes...</strong>
