@@ -3,7 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>NRD Operaciones</title>
+    <title>NRD Operaciones - Gestión de Operaciones</title>
+    <meta name="description" content="Aplicación web para gestión de operaciones NRD - Órdenes, Tareas, Productos y Contactos">
+    <meta name="keywords" content="NRD, operaciones, gestión, órdenes, tareas, productos">
+    
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -26,21 +29,32 @@
         const auth = getAuth(app);
         const database = getDatabase(app);
         
-        console.log('🔥 Firebase inicializado');
+        console.log('🔥 Firebase inicializado correctamente');
         
         // Variables globales
         let currentUser = null;
         let userData = null;
+        let dataCounts = {
+            ordenes: 0,
+            tareas: 0,
+            productos: 0,
+            proveedores: 0
+        };
         
         // Función para hacer login
         window.loginWithFirebase = async function(email, password) {
             try {
                 console.log('🔐 Intentando login con Firebase...');
+                showLoading('Iniciando sesión...');
+                
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 console.log('✅ Login exitoso:', userCredential.user.email);
+                
+                hideLoading();
                 return userCredential.user;
             } catch (error) {
                 console.error('❌ Error en login:', error);
+                hideLoading();
                 throw error;
             }
         };
@@ -48,10 +62,13 @@
         // Función para hacer logout
         window.logoutWithFirebase = async function() {
             try {
+                showLoading('Cerrando sesión...');
                 await signOut(auth);
                 console.log('✅ Logout exitoso');
+                hideLoading();
             } catch (error) {
                 console.error('❌ Error en logout:', error);
+                hideLoading();
             }
         };
         
@@ -80,10 +97,13 @@
                         id: key,
                         ...data[key]
                     }));
+                    dataCounts.ordenes = ordenes.length;
                     callback(ordenes);
                 } else {
+                    dataCounts.ordenes = 0;
                     callback([]);
                 }
+                updateStats();
             });
         };
         
@@ -97,10 +117,13 @@
                         id: key,
                         ...data[key]
                     }));
+                    dataCounts.tareas = tareas.length;
                     callback(tareas);
                 } else {
+                    dataCounts.tareas = 0;
                     callback([]);
                 }
+                updateStats();
             });
         };
         
@@ -114,10 +137,13 @@
                         id: key,
                         ...data[key]
                     }));
+                    dataCounts.productos = productos.length;
                     callback(productos);
                 } else {
+                    dataCounts.productos = 0;
                     callback([]);
                 }
+                updateStats();
             });
         };
         
@@ -131,12 +157,40 @@
                         id: key,
                         ...data[key]
                     }));
+                    dataCounts.proveedores = proveedores.length;
                     callback(proveedores);
                 } else {
+                    dataCounts.proveedores = 0;
                     callback([]);
                 }
+                updateStats();
             });
         };
+        
+        // Función para actualizar estadísticas
+        function updateStats() {
+            document.getElementById('ordenes-count').textContent = dataCounts.ordenes;
+            document.getElementById('tareas-count').textContent = dataCounts.tareas;
+            document.getElementById('productos-count').textContent = dataCounts.productos;
+            document.getElementById('proveedores-count').textContent = dataCounts.proveedores;
+        }
+        
+        // Función para mostrar loading
+        function showLoading(message) {
+            const loadingDiv = document.getElementById('loading');
+            if (loadingDiv) {
+                loadingDiv.textContent = message;
+                loadingDiv.style.display = 'block';
+            }
+        }
+        
+        // Función para ocultar loading
+        function hideLoading() {
+            const loadingDiv = document.getElementById('loading');
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+        }
         
         // Listener de autenticación
         onAuthStateChanged(auth, async (user) => {
@@ -146,9 +200,15 @@
                 try {
                     userData = await getUserData(user.uid);
                     console.log('👤 Datos del usuario:', userData);
-                    updateUI();
+                    updateUserInfo();
+                    showDashboard();
+                    loadRealData();
                 } catch (error) {
                     console.error('❌ Error obteniendo datos del usuario:', error);
+                    // Continuar sin datos del usuario
+                    updateUserInfo();
+                    showDashboard();
+                    loadRealData();
                 }
             } else {
                 console.log('👤 Usuario no autenticado');
@@ -158,16 +218,30 @@
             }
         });
         
-        // Función para actualizar la UI
-        function updateUI() {
-            if (currentUser && userData) {
-                showDashboard();
-                loadRealData();
+        // Función para actualizar información del usuario
+        function updateUserInfo() {
+            const userInfoElement = document.getElementById('user-info');
+            if (userInfoElement) {
+                if (currentUser && userData) {
+                    userInfoElement.innerHTML = `
+                        <strong>Email:</strong> ${currentUser.email}<br>
+                        <strong>Nombre:</strong> ${userData.displayName || userData.username || 'N/A'}<br>
+                        <strong>Rol:</strong> ${userData.role || 'N/A'}<br>
+                        <strong>Estado:</strong> ${userData.activo ? 'Activo' : 'Inactivo'}
+                    `;
+                } else if (currentUser) {
+                    userInfoElement.innerHTML = `
+                        <strong>Email:</strong> ${currentUser.email}<br>
+                        <strong>Estado:</strong> Conectado
+                    `;
+                }
             }
         }
         
         // Función para cargar datos reales
         function loadRealData() {
+            console.log('📊 Cargando datos reales de Firebase...');
+            
             // Cargar órdenes
             getOrdenes((ordenes) => {
                 console.log('📋 Órdenes cargadas:', ordenes.length);
@@ -199,12 +273,23 @@
             if (ordenesSection) {
                 const ordenesList = ordenesSection.querySelector('.data-list');
                 if (ordenesList) {
-                    ordenesList.innerHTML = ordenes.map(orden => `
-                        <div class="data-item">
-                            <strong>${orden.numero || 'N/A'}</strong> - ${orden.estado || 'Sin estado'}
-                            <br><small>Cliente: ${orden.cliente || 'N/A'}</small>
-                        </div>
-                    `).join('');
+                    if (ordenes.length === 0) {
+                        ordenesList.innerHTML = '<div class="data-item"><strong>No hay órdenes disponibles</strong></div>';
+                    } else {
+                        ordenesList.innerHTML = ordenes.slice(0, 10).map(orden => `
+                            <div class="data-item">
+                                <div class="data-header">
+                                    <strong>${orden.numero || orden.id}</strong>
+                                    <span class="status-badge status-${(orden.estado || '').toLowerCase().replace(' ', '-')}">${orden.estado || 'Sin estado'}</span>
+                                </div>
+                                <div class="data-details">
+                                    <small><strong>Cliente:</strong> ${orden.cliente || 'N/A'}</small><br>
+                                    <small><strong>Fecha:</strong> ${orden.fecha ? new Date(orden.fecha).toLocaleDateString() : 'N/A'}</small><br>
+                                    <small><strong>Total:</strong> $${(orden.total || 0).toFixed(2)}</small>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
                 }
             }
         }
@@ -214,12 +299,23 @@
             if (tareasSection) {
                 const tareasList = tareasSection.querySelector('.data-list');
                 if (tareasList) {
-                    tareasList.innerHTML = tareas.map(tarea => `
-                        <div class="data-item">
-                            <strong>${tarea.titulo || 'Sin título'}</strong> - ${tarea.completada ? 'Completada' : 'Pendiente'}
-                            <br><small>${tarea.descripcion || 'Sin descripción'}</small>
-                        </div>
-                    `).join('');
+                    if (tareas.length === 0) {
+                        tareasList.innerHTML = '<div class="data-item"><strong>No hay tareas disponibles</strong></div>';
+                    } else {
+                        tareasList.innerHTML = tareas.slice(0, 10).map(tarea => `
+                            <div class="data-item">
+                                <div class="data-header">
+                                    <strong>${tarea.titulo || 'Sin título'}</strong>
+                                    <span class="status-badge status-${tarea.completada ? 'completada' : 'pendiente'}">${tarea.completada ? 'Completada' : 'Pendiente'}</span>
+                                </div>
+                                <div class="data-details">
+                                    <small><strong>Descripción:</strong> ${tarea.descripcion || 'Sin descripción'}</small><br>
+                                    <small><strong>Prioridad:</strong> ${tarea.prioridad || 'N/A'}</small><br>
+                                    <small><strong>Asignada a:</strong> ${tarea.usuarioAsignado || 'N/A'}</small>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
                 }
             }
         }
@@ -229,12 +325,23 @@
             if (productosSection) {
                 const productosList = productosSection.querySelector('.data-list');
                 if (productosList) {
-                    productosList.innerHTML = productos.map(producto => `
-                        <div class="data-item">
-                            <strong>${producto.nombre || 'Sin nombre'}</strong> - $${(producto.precio || 0).toFixed(2)}
-                            <br><small>Stock: ${producto.stock || 0} ${producto.unidad || ''}</small>
-                        </div>
-                    `).join('');
+                    if (productos.length === 0) {
+                        productosList.innerHTML = '<div class="data-item"><strong>No hay productos disponibles</strong></div>';
+                    } else {
+                        productosList.innerHTML = productos.slice(0, 10).map(producto => `
+                            <div class="data-item">
+                                <div class="data-header">
+                                    <strong>${producto.nombre || 'Sin nombre'}</strong>
+                                    <span class="price">$${(producto.precio || 0).toFixed(2)}</span>
+                                </div>
+                                <div class="data-details">
+                                    <small><strong>Stock:</strong> ${producto.stock || 0} ${producto.unidad || ''}</small><br>
+                                    <small><strong>Proveedor:</strong> ${producto.proveedorNombre || 'N/A'}</small><br>
+                                    <small><strong>Estado:</strong> ${producto.archivado ? 'Archivado' : 'Activo'}</small>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
                 }
             }
         }
@@ -244,12 +351,23 @@
             if (proveedoresSection) {
                 const proveedoresList = proveedoresSection.querySelector('.data-list');
                 if (proveedoresList) {
-                    proveedoresList.innerHTML = proveedores.map(proveedor => `
-                        <div class="data-item">
-                            <strong>${proveedor.nombre || 'Sin nombre'}</strong>
-                            <br><small>${proveedor.celular || ''} - ${proveedor.email || ''}</small>
-                        </div>
-                    `).join('');
+                    if (proveedores.length === 0) {
+                        proveedoresList.innerHTML = '<div class="data-item"><strong>No hay proveedores disponibles</strong></div>';
+                    } else {
+                        proveedoresList.innerHTML = proveedores.slice(0, 10).map(proveedor => `
+                            <div class="data-item">
+                                <div class="data-header">
+                                    <strong>${proveedor.nombre || 'Sin nombre'}</strong>
+                                    <span class="type-badge">${proveedor.tipo || 'Proveedor'}</span>
+                                </div>
+                                <div class="data-details">
+                                    <small><strong>Celular:</strong> ${proveedor.celular || 'N/A'}</small><br>
+                                    <small><strong>Email:</strong> ${proveedor.email || 'N/A'}</small><br>
+                                    <small><strong>Dirección:</strong> ${proveedor.direccion || 'N/A'}</small>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
                 }
             }
         }
@@ -279,129 +397,285 @@
     </script>
     
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
             padding: 0;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             min-height: 100vh;
+            line-height: 1.6;
         }
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
+        
         .header {
             text-align: center;
             margin-bottom: 3rem;
         }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
         .nav {
             background: rgba(255, 255, 255, 0.1);
             padding: 1rem;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-bottom: 2rem;
             display: flex;
             justify-content: center;
             gap: 1rem;
             flex-wrap: wrap;
+            backdrop-filter: blur(10px);
         }
+        
         .nav a {
             color: white;
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
             background: rgba(255, 255, 255, 0.2);
-            transition: background 0.3s;
+            transition: all 0.3s ease;
+            font-weight: 500;
         }
+        
         .nav a:hover {
             background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
         }
+        
         .content {
             background: rgba(255, 255, 255, 0.1);
             padding: 2rem;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
+        
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
+        
         .stat-card {
             background: rgba(255, 255, 255, 0.1);
             padding: 1.5rem;
-            border-radius: 8px;
+            border-radius: 12px;
             text-align: center;
+            transition: transform 0.3s ease;
         }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
         .stat-number {
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: bold;
             margin-bottom: 0.5rem;
+            color: #ffeb3b;
         }
+        
         .login-form {
             max-width: 400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.1);
             padding: 2rem;
-            border-radius: 8px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
         }
+        
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
+        
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
+            font-weight: 500;
         }
+        
         .form-group input {
             width: 100%;
             padding: 0.75rem;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
         }
+        
+        .form-group input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+        }
+        
         .btn {
             width: 100%;
             background: #28a745;
             color: white;
             border: none;
             padding: 0.75rem;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 1rem;
             margin-top: 1rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
         }
+        
         .btn:hover {
             background: #218838;
+            transform: translateY(-2px);
         }
+        
         .btn-danger {
             background: #dc3545;
         }
+        
         .btn-danger:hover {
             background: #c82333;
         }
+        
         .hidden {
             display: none;
         }
+        
         .data-list {
             margin-top: 1rem;
         }
+        
         .data-item {
             background: rgba(255, 255, 255, 0.1);
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
         }
+        
+        .data-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+        }
+        
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .data-details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-pendiente {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .status-en-proceso {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .status-completada {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-cancelada {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+        
+        .type-badge {
+            background: #6f42c1;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        
         .user-info {
             background: rgba(255, 255, 255, 0.1);
-            padding: 1rem;
-            border-radius: 4px;
-            margin-bottom: 1rem;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .nav {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .stats {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Loading indicator -->
+    <div id="loading" class="loading">
+        Cargando...
+    </div>
+
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -426,15 +700,15 @@
                 <form onsubmit="handleLogin(event)">
                     <div class="form-group">
                         <label>Email:</label>
-                        <input type="email" id="email" required>
+                        <input type="email" id="email" required placeholder="tu@email.com">
                     </div>
                     <div class="form-group">
                         <label>Contraseña:</label>
-                        <input type="password" id="password" required>
+                        <input type="password" id="password" required placeholder="Tu contraseña">
                     </div>
                     <button type="submit" class="btn">Iniciar Sesión</button>
                 </form>
-                <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                <div style="margin-top: 1.5rem; font-size: 0.9rem; opacity: 0.8; text-align: center;">
                     <strong>Usuarios de prueba:</strong><br>
                     • admin@nrd.com / admin123<br>
                     • productor@nrd.com / productor123
@@ -450,7 +724,7 @@
                 <button onclick="handleLogout()" class="btn btn-danger">Cerrar Sesión</button>
             </div>
             
-            <h2>Dashboard</h2>
+            <h2>📊 Dashboard</h2>
             <div class="stats">
                 <div class="stat-card">
                     <div class="stat-number" id="ordenes-count">-</div>
@@ -469,18 +743,21 @@
                     <div>Proveedores</div>
                 </div>
             </div>
-            <div style="text-align: center;">
-                <h3>Funcionalidades Disponibles</h3>
-                <p>✅ Gestión de Órdenes (Datos reales de Firebase)</p>
+            <div style="text-align: center; background: rgba(255, 255, 255, 0.1); padding: 1.5rem; border-radius: 8px;">
+                <h3>✅ Funcionalidades Disponibles</h3>
+                <p>📋 Gestión de Órdenes (Datos reales de Firebase)</p>
                 <p>✅ Gestión de Tareas (Datos reales de Firebase)</p>
-                <p>✅ Catálogo de Productos (Datos reales de Firebase)</p>
-                <p>✅ Base de Datos de Contactos (Datos reales de Firebase)</p>
+                <p>📦 Catálogo de Productos (Datos reales de Firebase)</p>
+                <p>👥 Base de Datos de Contactos (Datos reales de Firebase)</p>
+                <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                    🔄 Todos los datos se sincronizan en tiempo real con la aplicación móvil
+                </p>
             </div>
         </div>
 
         <!-- Other Sections -->
         <div id="ordenes" class="content hidden">
-            <h2>Órdenes</h2>
+            <h2>📋 Órdenes</h2>
             <p>Gestión de órdenes de trabajo (Datos reales de Firebase)</p>
             <div class="data-list">
                 <div class="data-item">
@@ -490,7 +767,7 @@
         </div>
 
         <div id="tareas" class="content hidden">
-            <h2>Tareas</h2>
+            <h2>✅ Tareas</h2>
             <p>Gestión de tareas (Datos reales de Firebase)</p>
             <div class="data-list">
                 <div class="data-item">
@@ -500,7 +777,7 @@
         </div>
 
         <div id="productos" class="content hidden">
-            <h2>Productos</h2>
+            <h2>📦 Productos</h2>
             <p>Catálogo de productos (Datos reales de Firebase)</p>
             <div class="data-list">
                 <div class="data-item">
@@ -510,7 +787,7 @@
         </div>
 
         <div id="proveedores" class="content hidden">
-            <h2>Proveedores</h2>
+            <h2>👥 Proveedores</h2>
             <p>Base de datos de proveedores (Datos reales de Firebase)</p>
             <div class="data-list">
                 <div class="data-item">
@@ -548,7 +825,7 @@
             
             try {
                 await loginWithFirebase(email, password);
-                alert('✅ Login exitoso');
+                // El estado de autenticación se maneja automáticamente
             } catch (error) {
                 console.error('❌ Error en login:', error);
                 alert('❌ Error en login: ' + error.message);
@@ -558,7 +835,7 @@
         async function handleLogout() {
             try {
                 await logoutWithFirebase();
-                alert('✅ Sesión cerrada');
+                // El estado de autenticación se maneja automáticamente
             } catch (error) {
                 console.error('❌ Error en logout:', error);
                 alert('❌ Error cerrando sesión');
