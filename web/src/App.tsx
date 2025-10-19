@@ -1,5 +1,7 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import './App.css';
+import ContactosList from './components/ContactosList';
+import CostosList from './components/CostosList';
 import Dashboard from './components/Dashboard';
 import Features from './components/Features';
 import Footer from './components/Footer';
@@ -45,7 +47,8 @@ const AppContent: React.FC = () => {
           <Route path="/ordenes" element={<OrdenesList />} />
           <Route path="/tareas" element={<TareasList />} />
           <Route path="/productos" element={<ProductosList />} />
-          <Route path="/contactos" element={<div style={{ padding: '2rem', textAlign: 'center' }}><h1>Contactos</h1><p>Funcionalidad en desarrollo</p></div>} />
+          <Route path="/contactos" element={<ContactosList />} />
+          <Route path="/costos" element={<CostosList />} />
         </Routes>
       </>
     );

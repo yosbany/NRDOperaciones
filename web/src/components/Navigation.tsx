@@ -28,7 +28,8 @@ const Navigation: React.FC = () => {
   if (user.role === 'ADMIN') {
     navItems.push(
       { path: '/productos', label: 'Productos', icon: '📦' },
-      { path: '/contactos', label: 'Contactos', icon: '👥' }
+      { path: '/contactos', label: 'Contactos', icon: '👥' },
+      { path: '/costos', label: 'Costos', icon: '💰' }
     );
   }
 

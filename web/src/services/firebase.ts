@@ -98,6 +98,22 @@ export interface Tarea {
   updatedAt: string;
 }
 
+export interface IngredienteCosto {
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+  precio: number;
+}
+
+export interface RecetaCosto {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  ingredientes: IngredienteCosto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Roles de usuario
 export const USER_ROLES = {
   ADMIN: 'ADMIN',
@@ -416,4 +432,69 @@ export const getTareasByUserRole = (user: User, filtro: 'mis' | 'todas', callbac
     const data = snapshot.val();
     processTareas(data);
   });
+};
+
+// Funciones para Recetas de Costos
+export const getRecetasCostos = (callback: (recetas: RecetaCosto[]) => void) => {
+  const recetasRef = ref(database, 'recetasCostos');
+  
+  const processRecetas = (data: any) => {
+    if (!data) {
+      callback([]);
+      return;
+    }
+    
+    const recetas: RecetaCosto[] = Object.keys(data).map(key => ({
+      id: key,
+      ...data[key]
+    }));
+    
+    callback(recetas);
+  };
+  
+  onValue(recetasRef, (snapshot) => {
+    const data = snapshot.val();
+    processRecetas(data);
+  });
+};
+
+export const saveRecetaCosto = async (receta: Omit<RecetaCosto, 'id'>): Promise<string> => {
+  try {
+    const recetasRef = ref(database, 'recetasCostos');
+    const newRecetaRef = push(recetasRef);
+    
+    await set(newRecetaRef, {
+      ...receta,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    
+    return newRecetaRef.key!;
+  } catch (error) {
+    console.error('Error guardando receta:', error);
+    throw error;
+  }
+};
+
+export const updateRecetaCosto = async (id: string, updates: Partial<RecetaCosto>): Promise<void> => {
+  try {
+    const recetaRef = ref(database, `recetasCostos/${id}`);
+    await update(recetaRef, {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error actualizando receta:', error);
+    throw error;
+  }
+};
+
+export const deleteRecetaCosto = async (id: string): Promise<void> => {
+  try {
+    const recetaRef = ref(database, `recetasCostos/${id}`);
+    await remove(recetaRef);
+  } catch (error) {
+    console.error('Error eliminando receta:', error);
+    throw error;
+  }
 };
