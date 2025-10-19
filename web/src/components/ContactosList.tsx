@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getProveedores, saveProveedor, updateProveedor, deleteProveedor, Proveedor } from '../services/firebase';
+import { getProveedores, saveProveedor, updateProveedor, deleteProveedor, Proveedor } from '../services/firebaseUnified';
 
 const ContactosList: React.FC = () => {
   const { user } = useAuth();

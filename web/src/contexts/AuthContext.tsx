@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, getUserByUid, loginWithFirebase, logoutFromFirebase } from '../services/firebase';
-import { auth } from '../services/firebaseConfig';
+import { User, getUserByUid, loginWithFirebase, logout as logoutFirebase } from '../services/firebaseUnified';
+import { auth } from '../../../shared/services/firebaseConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await logoutFromFirebase();
+      await logoutFirebase();
       setUser(null);
     } catch (error) {
       console.error('Error en logout:', error);

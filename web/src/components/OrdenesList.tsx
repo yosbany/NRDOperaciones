@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrdenesByUserRole, updateOrden, Orden } from '../services/firebase';
+import { getOrdenes, updateOrden, Orden } from '../services/firebaseUnified';
 
 const OrdenesList: React.FC = () => {
   const { user } = useAuth();
@@ -9,12 +9,20 @@ const OrdenesList: React.FC = () => {
   const [filter, setFilter] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
 
   useEffect(() => {
-    if (user) {
-      getOrdenesByUserRole(user, (ordenesData) => {
-        setOrdenes(ordenesData);
-        setLoading(false);
-      });
-    }
+    const loadOrdenes = async () => {
+      if (user) {
+        try {
+          const ordenesData = await getOrdenes();
+          setOrdenes(ordenesData);
+        } catch (error) {
+          console.error('Error cargando órdenes:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadOrdenes();
   }, [user]);
 
   const handleUpdateEstado = async (ordenId: string, nuevoEstado: string) => {

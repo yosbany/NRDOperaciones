@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getTareasByUserRole, saveTarea, updateTarea, deleteTarea, Tarea } from '../services/firebase';
+import { getTareas, saveTarea, updateTarea, deleteTarea, Tarea } from '../services/firebaseUnified';
 
 const TareasList: React.FC = () => {
   const { user } = useAuth();

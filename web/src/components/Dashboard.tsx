@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrdenes, getProductos, getProveedores, getTareas, Orden, Producto, Proveedor, Tarea } from '../services/firebase';
+import { getOrdenes, getProductos, getProveedores, getTareas, getDashboardStats, Orden, Producto, Proveedor, Tarea } from '../services/firebaseUnified';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();

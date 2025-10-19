@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getRecetasCostos, saveRecetaCosto, updateRecetaCosto, deleteRecetaCosto, RecetaCosto } from '../services/firebase';
+import { getRecetasCostos, saveRecetaCosto, updateRecetaCosto, deleteRecetaCosto, RecetaCosto } from '../services/firebaseUnified';
 
 const CostosList: React.FC = () => {
   const { user } = useAuth();
