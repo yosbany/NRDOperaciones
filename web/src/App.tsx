@@ -70,7 +70,7 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <Router basename="/NRDOperaciones">
+    <Router>
       <AuthProvider>
         <div className="App">
           <Routes>
