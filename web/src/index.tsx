@@ -2,20 +2,22 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
+
+console.log('🚀 Iniciando aplicación React...');
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
-// Force rebuild Sun Oct 19 09:18:45 -03 2025
-// Trigger deployment Sun Oct 19 10:11:52 -03 2025
+console.log('🚀 Root element encontrado:', !!document.getElementById('root'));
+
+try {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+  console.log('✅ Aplicación React renderizada correctamente');
+} catch (error) {
+  console.error('❌ Error renderizando aplicación:', error);
+}
