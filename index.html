@@ -276,19 +276,45 @@
                     if (ordenes.length === 0) {
                         ordenesList.innerHTML = '<div class="data-item"><strong>No hay órdenes disponibles</strong></div>';
                     } else {
-                        ordenesList.innerHTML = ordenes.slice(0, 10).map(orden => `
-                            <div class="data-item">
-                                <div class="data-header">
-                                    <strong>${orden.numero || orden.id}</strong>
-                                    <span class="status-badge status-${(orden.estado || '').toLowerCase().replace(' ', '-')}">${orden.estado || 'Sin estado'}</span>
+                        ordenesList.innerHTML = ordenes.slice(0, 10).map(orden => {
+                            // Formatear fecha
+                            let fechaFormateada = 'N/A';
+                            if (orden.fecha) {
+                                try {
+                                    fechaFormateada = new Date(orden.fecha).toLocaleDateString('es-ES');
+                                } catch (e) {
+                                    fechaFormateada = orden.fecha;
+                                }
+                            }
+                            
+                            // Formatear estado
+                            const estado = orden.estado || 'Sin estado';
+                            const estadoClass = estado.toLowerCase().replace(/\s+/g, '-');
+                            
+                            // Formatear número de orden
+                            const numeroOrden = orden.numero || orden.id || 'Sin número';
+                            
+                            // Formatear cliente
+                            const cliente = orden.cliente || orden.clienteNombre || 'N/A';
+                            
+                            // Formatear total
+                            const total = orden.total || 0;
+                            
+                            return `
+                                <div class="data-item">
+                                    <div class="data-header">
+                                        <strong>Orden #${numeroOrden}</strong>
+                                        <span class="status-badge status-${estadoClass}">${estado}</span>
+                                    </div>
+                                    <div class="data-details">
+                                        <small><strong>Cliente:</strong> ${cliente}</small><br>
+                                        <small><strong>Fecha:</strong> ${fechaFormateada}</small><br>
+                                        <small><strong>Total:</strong> $${total.toFixed(2)}</small>
+                                        ${orden.productos && orden.productos.length > 0 ? `<br><small><strong>Productos:</strong> ${orden.productos.length} items</small>` : ''}
+                                    </div>
                                 </div>
-                                <div class="data-details">
-                                    <small><strong>Cliente:</strong> ${orden.cliente || 'N/A'}</small><br>
-                                    <small><strong>Fecha:</strong> ${orden.fecha ? new Date(orden.fecha).toLocaleDateString() : 'N/A'}</small><br>
-                                    <small><strong>Total:</strong> $${(orden.total || 0).toFixed(2)}</small>
-                                </div>
-                            </div>
-                        `).join('');
+                            `;
+                        }).join('');
                     }
                 }
             }
@@ -302,19 +328,40 @@
                     if (tareas.length === 0) {
                         tareasList.innerHTML = '<div class="data-item"><strong>No hay tareas disponibles</strong></div>';
                     } else {
-                        tareasList.innerHTML = tareas.slice(0, 10).map(tarea => `
-                            <div class="data-item">
-                                <div class="data-header">
-                                    <strong>${tarea.titulo || 'Sin título'}</strong>
-                                    <span class="status-badge status-${tarea.completada ? 'completada' : 'pendiente'}">${tarea.completada ? 'Completada' : 'Pendiente'}</span>
+                        tareasList.innerHTML = tareas.slice(0, 10).map(tarea => {
+                            // Formatear prioridad
+                            const prioridad = tarea.prioridad || 'media';
+                            const prioridadClass = prioridad.toLowerCase();
+                            
+                            // Formatear estado
+                            const estado = tarea.completada ? 'Completada' : 'Pendiente';
+                            const estadoClass = tarea.completada ? 'completada' : 'pendiente';
+                            
+                            // Formatear fecha de creación
+                            let fechaFormateada = 'N/A';
+                            if (tarea.createdAt) {
+                                try {
+                                    fechaFormateada = new Date(tarea.createdAt).toLocaleDateString('es-ES');
+                                } catch (e) {
+                                    fechaFormateada = tarea.createdAt;
+                                }
+                            }
+                            
+                            return `
+                                <div class="data-item">
+                                    <div class="data-header">
+                                        <strong>${tarea.titulo || 'Sin título'}</strong>
+                                        <span class="status-badge status-${estadoClass}">${estado}</span>
+                                    </div>
+                                    <div class="data-details">
+                                        <small><strong>Descripción:</strong> ${tarea.descripcion || 'Sin descripción'}</small><br>
+                                        <small><strong>Prioridad:</strong> <span class="priority-${prioridadClass}">${prioridad.toUpperCase()}</span></small><br>
+                                        <small><strong>Asignada a:</strong> ${tarea.usuarioAsignado || 'N/A'}</small><br>
+                                        <small><strong>Creada:</strong> ${fechaFormateada}</small>
+                                    </div>
                                 </div>
-                                <div class="data-details">
-                                    <small><strong>Descripción:</strong> ${tarea.descripcion || 'Sin descripción'}</small><br>
-                                    <small><strong>Prioridad:</strong> ${tarea.prioridad || 'N/A'}</small><br>
-                                    <small><strong>Asignada a:</strong> ${tarea.usuarioAsignado || 'N/A'}</small>
-                                </div>
-                            </div>
-                        `).join('');
+                            `;
+                        }).join('');
                     }
                 }
             }
@@ -628,6 +675,21 @@
             padding: 0.25rem 0.75rem;
             border-radius: 20px;
             font-size: 0.8rem;
+        }
+        
+        .priority-alta {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .priority-media {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .priority-baja {
+            color: #28a745;
+            font-weight: bold;
         }
         
         .user-info {
