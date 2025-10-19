@@ -12,102 +12,245 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         .container {
-            text-align: center;
-            max-width: 600px;
+            max-width: 1200px;
+            margin: 0 auto;
             padding: 2rem;
         }
-        .test-button {
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .nav {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            transition: background 0.3s;
+        }
+        .nav a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .login-form {
+            max-width: 400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .btn {
+            width: 100%;
             background: #28a745;
             color: white;
             border: none;
-            padding: 1rem 2rem;
+            padding: 0.75rem;
             border-radius: 4px;
             cursor: pointer;
             font-size: 1rem;
-            margin: 1rem;
+            margin-top: 1rem;
         }
-        .test-button:hover {
+        .btn:hover {
             background: #218838;
         }
-        .status {
-            margin: 1rem 0;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 NRD Operaciones</h1>
-        <p>Página de diagnóstico - Si ves esto, GitHub Pages funciona</p>
-        
-        <div class="status">
-            <h3>Estado del Sistema:</h3>
-            <p>✅ HTML cargado</p>
-            <p>✅ CSS cargado</p>
-            <p id="js-status">⏳ Verificando JavaScript...</p>
-            <p id="react-status">⏳ Verificando React...</p>
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 NRD Operaciones</h1>
+            <p>Aplicación web para gestión de operaciones</p>
         </div>
-        
-        <button class="test-button" onclick="testJavaScript()">
-            Probar JavaScript
-        </button>
-        
-        <button class="test-button" onclick="testReact()">
-            Probar React
-        </button>
-        
-        <div id="test-results"></div>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="#" onclick="showSection('login')">Iniciar Sesión</a>
+            <a href="#" onclick="showSection('dashboard')">Dashboard</a>
+            <a href="#" onclick="showSection('ordenes')">Órdenes</a>
+            <a href="#" onclick="showSection('tareas')">Tareas</a>
+            <a href="#" onclick="showSection('productos')">Productos</a>
+        </nav>
+
+        <!-- Login Section -->
+        <div id="login" class="content">
+            <div class="login-form">
+                <h2>Iniciar Sesión</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña:</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" class="btn">Iniciar Sesión</button>
+                </form>
+                <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+                    <strong>Usuarios de prueba:</strong><br>
+                    • admin@nrd.com / admin123<br>
+                    • productor@nrd.com / productor123
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="content hidden">
+            <h2>Dashboard</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number">12</div>
+                    <div>Órdenes Activas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">8</div>
+                    <div>Tareas Pendientes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">45</div>
+                    <div>Productos Activos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">23</div>
+                    <div>Contactos</div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <h3>Funcionalidades Disponibles</h3>
+                <p>✅ Gestión de Órdenes</p>
+                <p>✅ Gestión de Tareas</p>
+                <p>✅ Catálogo de Productos</p>
+                <p>✅ Base de Datos de Contactos</p>
+            </div>
+        </div>
+
+        <!-- Other Sections -->
+        <div id="ordenes" class="content hidden">
+            <h2>Órdenes</h2>
+            <p>Gestión de órdenes de trabajo</p>
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
+                <h3>Órdenes Recientes</h3>
+                <p>• Orden #001 - En Proceso</p>
+                <p>• Orden #002 - Pendiente</p>
+                <p>• Orden #003 - Completada</p>
+            </div>
+        </div>
+
+        <div id="tareas" class="content hidden">
+            <h2>Tareas</h2>
+            <p>Gestión de tareas</p>
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
+                <h3>Tareas Pendientes</h3>
+                <p>• Revisar inventario</p>
+                <p>• Contactar proveedor</p>
+                <p>• Actualizar precios</p>
+            </div>
+        </div>
+
+        <div id="productos" class="content hidden">
+            <h2>Productos</h2>
+            <p>Catálogo de productos</p>
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 4px;">
+                <h3>Productos Destacados</h3>
+                <p>• Producto A - $100</p>
+                <p>• Producto B - $150</p>
+                <p>• Producto C - $200</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        console.log('🚀 JavaScript funcionando');
-        document.getElementById('js-status').innerHTML = '✅ JavaScript funcionando';
+        console.log('🚀 Aplicación NRD Operaciones iniciada');
         
-        function testJavaScript() {
-            alert('¡JavaScript está funcionando correctamente!');
-            document.getElementById('test-results').innerHTML = 
-                '<div class="status"><h3>✅ JavaScript OK</h3><p>JavaScript está habilitado y funcionando.</p></div>';
+        function showSection(sectionId) {
+            // Ocultar todas las secciones
+            const sections = document.querySelectorAll('.content');
+            sections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Mostrar la sección seleccionada
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+            
+            console.log('📱 Navegando a:', sectionId);
         }
         
-        function testReact() {
-            console.log('🔍 Verificando React...');
+        function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
             
-            // Verificar si React está cargado
-            if (typeof React !== 'undefined') {
-                console.log('✅ React encontrado');
-                document.getElementById('react-status').innerHTML = '✅ React cargado';
-                document.getElementById('test-results').innerHTML = 
-                    '<div class="status"><h3>✅ React OK</h3><p>React está cargado y funcionando.</p></div>';
+            console.log('🔐 Intentando login con:', email);
+            
+            // Simular login
+            if (email === 'admin@nrd.com' && password === 'admin123') {
+                alert('✅ Login exitoso como Administrador');
+                showSection('dashboard');
+            } else if (email === 'productor@nrd.com' && password === 'productor123') {
+                alert('✅ Login exitoso como Productor');
+                showSection('dashboard');
             } else {
-                console.log('❌ React no encontrado');
-                document.getElementById('react-status').innerHTML = '❌ React no cargado';
-                document.getElementById('test-results').innerHTML = 
-                    '<div class="status"><h3>❌ React Error</h3><p>React no se está cargando. Verifica la consola para errores.</p></div>';
+                alert('❌ Credenciales incorrectas');
             }
         }
         
-        // Verificar si los archivos se están cargando
-        fetch('./static/js/main.1108c08f.js')
-            .then(response => {
-                if (response.ok) {
-                    console.log('✅ Archivo JavaScript encontrado');
-                } else {
-                    console.error('❌ Archivo JavaScript no encontrado');
-                }
-            })
-            .catch(error => {
-                console.error('❌ Error cargando JavaScript:', error);
-            });
+        // Mostrar login por defecto
+        showSection('login');
     </script>
-    
-    <!-- Cargar React -->
-    <script defer src="./static/js/main.1108c08f.js"></script>
 </body>
 </html>
