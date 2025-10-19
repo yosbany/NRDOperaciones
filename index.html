@@ -41,6 +41,7 @@
             proveedores: 0
         };
         let allOrdenes = [];
+        let allProveedores = [];
         let currentFilter = 'ultimas';
         
         // Función para hacer login
@@ -143,7 +144,9 @@
                     break;
                 case 'proveedor':
                     // Filtrar por proveedor (si hay campo proveedor)
-                    filteredOrdenes = allOrdenes.filter(orden => orden.proveedor || orden.proveedorNombre);
+                    filteredOrdenes = allOrdenes.filter(orden => {
+                        return orden.proveedorId || orden.proveedor || orden.proveedorNombre;
+                    });
                     break;
                 case 'todas':
                     // Mostrar todas
@@ -204,15 +207,23 @@
                         id: key,
                         ...data[key]
                     }));
+                    allProveedores = proveedores;
                     dataCounts.proveedores = proveedores.length;
                     callback(proveedores);
                 } else {
+                    allProveedores = [];
                     dataCounts.proveedores = 0;
                     callback([]);
                 }
                 updateStats();
             });
         };
+        
+        // Función para buscar proveedor por ID
+        function findProveedorById(proveedorId) {
+            if (!proveedorId || !allProveedores.length) return null;
+            return allProveedores.find(proveedor => proveedor.id === proveedorId);
+        }
         
         // Función para actualizar estadísticas
         function updateStats() {
@@ -341,8 +352,17 @@
                             // Formatear número de orden
                             const numeroOrden = orden.numero || orden.id || 'Sin número';
                             
-                            // Formatear cliente
-                            const cliente = orden.cliente || orden.clienteNombre || 'N/A';
+                            // Formatear cliente - buscar en proveedores si es un ID
+                            let cliente = orden.cliente || orden.clienteNombre || 'N/A';
+                            
+                            // Si el cliente es un ID, buscar en proveedores
+                            if (orden.proveedorId || orden.proveedor) {
+                                const proveedorId = orden.proveedorId || orden.proveedor;
+                                const proveedor = findProveedorById(proveedorId);
+                                if (proveedor) {
+                                    cliente = proveedor.nombre || cliente;
+                                }
+                            }
                             
                             // Formatear total
                             const total = orden.total || 0;
@@ -460,19 +480,38 @@
                     if (proveedores.length === 0) {
                         proveedoresList.innerHTML = '<div class="data-item"><strong>No hay proveedores disponibles</strong></div>';
                     } else {
-                        proveedoresList.innerHTML = proveedores.slice(0, 10).map(proveedor => `
-                            <div class="data-item">
-                                <div class="data-header">
-                                    <strong>${proveedor.nombre || 'Sin nombre'}</strong>
-                                    <span class="type-badge">${proveedor.tipo || 'Proveedor'}</span>
+                        proveedoresList.innerHTML = proveedores.map(proveedor => {
+                            // Formatear tipo
+                            const tipo = proveedor.tipo || 'Proveedor';
+                            const tipoClass = tipo.toLowerCase().replace(/\s+/g, '-');
+                            
+                            return `
+                                <div class="data-item">
+                                    <div class="order-company">${proveedor.nombre || 'Sin nombre'}</div>
+                                    <div class="order-meta">
+                                        <div class="order-meta-item">
+                                            <span>📱</span>
+                                            <span>${proveedor.celular || 'N/A'}</span>
+                                        </div>
+                                        <div class="order-meta-item">
+                                            <span>📧</span>
+                                            <span>${proveedor.email || 'N/A'}</span>
+                                        </div>
+                                        <div class="order-meta-item">
+                                            <span>📍</span>
+                                            <span>${proveedor.direccion || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="data-header">
+                                        <div class="order-meta-item">
+                                            <span>🏷️</span>
+                                            <span>ID: ${proveedor.id}</span>
+                                        </div>
+                                        <span class="type-badge">${tipo}</span>
+                                    </div>
                                 </div>
-                                <div class="data-details">
-                                    <small><strong>Celular:</strong> ${proveedor.celular || 'N/A'}</small><br>
-                                    <small><strong>Email:</strong> ${proveedor.email || 'N/A'}</small><br>
-                                    <small><strong>Dirección:</strong> ${proveedor.direccion || 'N/A'}</small>
-                                </div>
-                            </div>
-                        `).join('');
+                            `;
+                        }).join('');
                     }
                 }
             }

@@ -1,7 +1,7 @@
 {
   "name": "purchaseordersappexpo",
   "main": "index.js",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
