@@ -206,6 +206,23 @@ export const getTareasByUserRole = async (user: User, callback: (tareas: Tarea[]
   return dataAccess.getTareasByUserRole(user, callback);
 };
 
+// Funciones con callback para compatibilidad con app móvil
+export const getOrdenes = async (callback: (ordenes: Orden[]) => void): Promise<void> => {
+  return dataAccess.getOrdenesCallback(callback);
+};
+
+export const getProductos = async (callback: (productos: Producto[]) => void): Promise<void> => {
+  return dataAccess.getProductosCallback(callback);
+};
+
+export const getProveedores = async (callback: (proveedores: Proveedor[]) => void): Promise<void> => {
+  return dataAccess.getProveedoresCallback(callback);
+};
+
+export const getTareas = async (callback: (tareas: Tarea[]) => void): Promise<void> => {
+  return dataAccess.getTareasCallback(callback);
+};
+
 // Obtener órdenes con información de proveedores resuelta
 export const getOrdenesConProveedores = async (): Promise<(Orden & { proveedor?: Proveedor })[]> => {
   return dataAccess.getOrdenesConProveedores();

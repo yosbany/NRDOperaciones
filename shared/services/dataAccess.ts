@@ -526,6 +526,50 @@ export class DataAccessLayer {
     }
   }
 
+  // Obtener órdenes con callback (para compatibilidad con app móvil)
+  async getOrdenesCallback(callback: (ordenes: Orden[]) => void): Promise<void> {
+    try {
+      const ordenes = await this.getOrdenes();
+      callback(ordenes);
+    } catch (error) {
+      console.error('Error obteniendo órdenes:', error);
+      callback([]);
+    }
+  }
+
+  // Obtener productos con callback (para compatibilidad con app móvil)
+  async getProductosCallback(callback: (productos: Producto[]) => void): Promise<void> {
+    try {
+      const productos = await this.getProductos();
+      callback(productos);
+    } catch (error) {
+      console.error('Error obteniendo productos:', error);
+      callback([]);
+    }
+  }
+
+  // Obtener proveedores con callback (para compatibilidad con app móvil)
+  async getProveedoresCallback(callback: (proveedores: Proveedor[]) => void): Promise<void> {
+    try {
+      const proveedores = await this.getProveedores();
+      callback(proveedores);
+    } catch (error) {
+      console.error('Error obteniendo proveedores:', error);
+      callback([]);
+    }
+  }
+
+  // Obtener tareas con callback (para compatibilidad con app móvil)
+  async getTareasCallback(callback: (tareas: Tarea[]) => void): Promise<void> {
+    try {
+      const tareas = await this.getTareas();
+      callback(tareas);
+    } catch (error) {
+      console.error('Error obteniendo tareas:', error);
+      callback([]);
+    }
+  }
+
   // Obtener tareas por rol de usuario (para compatibilidad con app móvil)
   async getTareasByUserRole(user: User, callback: (tareas: Tarea[]) => void): Promise<void> {
     try {

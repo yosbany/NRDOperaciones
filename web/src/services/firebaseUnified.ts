@@ -1,8 +1,8 @@
 // Servicio de Firebase unificado para la app web
-import { User as FirebaseAuthUser, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth } from '../../../shared/services/firebaseConfig';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Orden, Producto, Proveedor, Tarea, User, RecetaCosto } from '../../../shared/services/types';
+import { auth } from '../../../shared/services/firebaseConfig';
+import { Orden, Producto, Proveedor, RecetaCosto, Tarea, User } from '../../../shared/services/types';
 
 // ===== AUTENTICACIÓN =====
 
@@ -235,4 +235,4 @@ export const onTareasChange = (callback: (tareas: Tarea[]) => void): (() => void
 
 // ===== EXPORTACIONES DE TIPOS =====
 
-export type { Orden, Producto, Proveedor, Tarea, User, RecetaCosto };
+export type { Orden, Producto, Proveedor, RecetaCosto, Tarea, User };
