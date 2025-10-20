@@ -8,7 +8,3 @@ export * from './types';
 
 // Capa de acceso a datos
 export { DataAccessLayer, dataAccess } from './dataAccess';
-
-// Adaptadores específicos
-export { MobileDataAdapter, mobileDataAdapter } from './mobileAdapter';
-export { WebDataAdapter, webDataAdapter } from './webAdapter';

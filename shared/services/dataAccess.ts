@@ -504,6 +504,152 @@ export class DataAccessLayer {
     }
   }
 
+  // ===== FUNCIONES ESPECÍFICAS PARA MÓVIL =====
+  
+  // Obtener órdenes por rol de usuario (para compatibilidad con app móvil)
+  async getOrdenesByUserRole(user: User, callback: (ordenes: Orden[]) => void): Promise<void> {
+    try {
+      const ordenes = await this.getOrdenes();
+      
+      // Filtrar órdenes según el rol del usuario
+      let ordenesFiltradas = ordenes;
+      
+      if (user.role === 'PRODUCTOR' && user.contactId) {
+        // Los productores solo ven sus propias órdenes
+        ordenesFiltradas = ordenes.filter(orden => orden.proveedorId === user.contactId);
+      }
+      
+      callback(ordenesFiltradas);
+    } catch (error) {
+      console.error('Error obteniendo órdenes por rol:', error);
+      callback([]);
+    }
+  }
+
+  // Obtener tareas por rol de usuario (para compatibilidad con app móvil)
+  async getTareasByUserRole(user: User, callback: (tareas: Tarea[]) => void): Promise<void> {
+    try {
+      const tareas = await this.getTareas();
+      
+      // Filtrar tareas según el rol del usuario
+      let tareasFiltradas = tareas;
+      
+      if (user.role === 'PRODUCTOR' && user.contactId) {
+        // Los productores solo ven tareas asignadas a ellos
+        tareasFiltradas = tareas.filter(tarea => tarea.asignadoA === user.contactId);
+      }
+      
+      callback(tareasFiltradas);
+    } catch (error) {
+      console.error('Error obteniendo tareas por rol:', error);
+      callback([]);
+    }
+  }
+
+  // Obtener órdenes con información de proveedores resuelta
+  async getOrdenesConProveedores(): Promise<(Orden & { proveedor?: Proveedor })[]> {
+    const [ordenes, proveedores] = await Promise.all([
+      this.getOrdenes(),
+      this.getProveedores()
+    ]);
+
+    return ordenes.map(orden => ({
+      ...orden,
+      proveedor: orden.proveedorId ? proveedores.find(p => p.id === orden.proveedorId) : undefined
+    }));
+  }
+
+  // Obtener productos con información de proveedores resuelta
+  async getProductosConProveedores(): Promise<(Producto & { proveedor?: Proveedor })[]> {
+    const [productos, proveedores] = await Promise.all([
+      this.getProductos(),
+      this.getProveedores()
+    ]);
+
+    return productos.map(producto => ({
+      ...producto,
+      proveedor: producto.proveedorId ? proveedores.find(p => p.id === producto.proveedorId) : undefined
+    }));
+  }
+
+  // Buscar proveedor por ID (método de conveniencia)
+  async findProveedorById(proveedorId: string): Promise<Proveedor | null> {
+    return this.getProveedorById(proveedorId);
+  }
+
+  // Buscar producto por ID (método de conveniencia)
+  async findProductoById(productoId: string): Promise<Producto | null> {
+    return this.getProductoById(productoId);
+  }
+
+  // Obtener datos completos para el dashboard (específico para web)
+  async getDashboardData(): Promise<{
+    ordenes: Orden[];
+    productos: Producto[];
+    proveedores: Proveedor[];
+    tareas: Tarea[];
+    ordenesConProveedores: (Orden & { proveedor?: Proveedor })[];
+    productosConProveedores: (Producto & { proveedor?: Proveedor })[];
+  }> {
+    const [ordenes, productos, proveedores, tareas] = await Promise.all([
+      this.getOrdenes(),
+      this.getProductos(),
+      this.getProveedores(),
+      this.getTareas()
+    ]);
+
+    const ordenesConProveedores = ordenes.map(orden => ({
+      ...orden,
+      proveedor: orden.proveedorId ? proveedores.find(p => p.id === orden.proveedorId) : undefined
+    }));
+
+    const productosConProveedores = productos.map(producto => ({
+      ...producto,
+      proveedor: producto.proveedorId ? proveedores.find(p => p.id === producto.proveedorId) : undefined
+    }));
+
+    return {
+      ordenes,
+      productos,
+      proveedores,
+      tareas,
+      ordenesConProveedores,
+      productosConProveedores
+    };
+  }
+
+  // Obtener estadísticas del dashboard (específico para web)
+  async getDashboardStats(): Promise<{
+    totalOrdenes: number;
+    totalProductos: number;
+    totalProveedores: number;
+    totalTareas: number;
+    ordenesPendientes: number;
+    ordenesCompletadas: number;
+    productosBajoStock: number;
+  }> {
+    const [ordenes, productos, proveedores, tareas] = await Promise.all([
+      this.getOrdenes(),
+      this.getProductos(),
+      this.getProveedores(),
+      this.getTareas()
+    ]);
+
+    const ordenesPendientes = ordenes.filter(o => o.estado === 'PENDIENTE').length;
+    const ordenesCompletadas = ordenes.filter(o => o.estado === 'COMPLETADA').length;
+    const productosBajoStock = productos.filter(p => p.stock < 10).length;
+
+    return {
+      totalOrdenes: ordenes.length,
+      totalProductos: productos.length,
+      totalProveedores: proveedores.length,
+      totalTareas: tareas.length,
+      ordenesPendientes,
+      ordenesCompletadas,
+      productosBajoStock
+    };
+  }
+
   // ===== LISTENERS EN TIEMPO REAL =====
   onOrdenesChange(callback: (ordenes: Orden[]) => void): () => void {
     const ordenesRef = ref(this.database, 'ordenes');

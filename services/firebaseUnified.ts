@@ -1,9 +1,7 @@
-// Servicio de Firebase unificado para la app móvil
+// Servicio de Firebase unificado para ambas plataformas
 import { User as FirebaseAuthUser, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { USER_ROLES, UserRole } from '../constants/Config';
-import { clearAuthState, saveAuthState, saveUserData } from './authStorage';
-import { auth, database } from '../shared/services/firebaseConfig';
-import { mobileDataAdapter } from '../shared/services/mobileAdapter';
+import { auth } from '../shared/services/firebaseConfig';
+import { dataAccess } from '../shared/services/dataAccess';
 import { Orden, Producto, Proveedor, Tarea, User, RecetaCosto } from '../shared/services/types';
 
 // Importación condicional de notificaciones para compatibilidad con Expo Go
@@ -16,7 +14,6 @@ try {
 
 // Verificar que Firebase esté inicializado correctamente
 console.log('🔥 Firebase Auth inicializado:', !!auth);
-console.log('🔥 Firebase Database inicializado:', !!database);
 
 // ===== AUTENTICACIÓN =====
 
@@ -30,15 +27,11 @@ export const loginWithFirebase = async (email: string, password: string): Promis
     console.log('✅ Usuario autenticado:', firebaseUser.email);
     
     // Obtener datos del usuario desde la base de datos
-    const userData = await mobileDataAdapter.getUserByUid(firebaseUser.uid);
+    const userData = await dataAccess.getUserByUid(firebaseUser.uid);
     
     if (!userData) {
       throw new Error('Usuario no encontrado en la base de datos');
     }
-    
-    // Guardar estado de autenticación
-    await saveAuthState(firebaseUser.uid, firebaseUser.email || '');
-    await saveUserData(userData);
     
     return userData;
   } catch (error) {
@@ -52,7 +45,6 @@ export const logout = async (): Promise<void> => {
   try {
     console.log('🚪 Cerrando sesión...');
     await signOut(auth);
-    await clearAuthState();
     console.log('✅ Sesión cerrada correctamente');
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
@@ -66,7 +58,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     
-    return await mobileDataAdapter.getUserByUid(firebaseUser.uid);
+    return await dataAccess.getUserByUid(firebaseUser.uid);
   } catch (error) {
     console.error('❌ Error obteniendo usuario actual:', error);
     return null;
@@ -75,171 +67,193 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
 // Función para obtener usuario por UID
 export const getUserByUid = async (uid: string): Promise<User | null> => {
-  return mobileDataAdapter.getUserByUid(uid);
+  return dataAccess.getUserByUid(uid);
 };
 
 // ===== ÓRDENES =====
 
 export const getOrdenes = async (): Promise<Orden[]> => {
-  return mobileDataAdapter.getOrdenes();
+  return dataAccess.getOrdenes();
 };
 
 export const getOrdenById = async (id: string): Promise<Orden | null> => {
-  return mobileDataAdapter.getOrdenById(id);
+  return dataAccess.getOrdenById(id);
 };
 
 export const saveOrden = async (orden: Omit<Orden, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveOrden(orden);
+  return dataAccess.saveOrden(orden);
 };
 
 export const updateOrden = async (id: string, orden: Partial<Orden>): Promise<void> => {
-  return mobileDataAdapter.updateOrden(id, orden);
+  return dataAccess.updateOrden(id, orden);
 };
 
 export const deleteOrden = async (id: string): Promise<void> => {
-  return mobileDataAdapter.deleteOrden(id);
+  return dataAccess.deleteOrden(id);
 };
 
 // ===== PRODUCTOS =====
 
 export const getProductos = async (): Promise<Producto[]> => {
-  return mobileDataAdapter.getProductos();
+  return dataAccess.getProductos();
 };
 
 export const getProductoById = async (id: string): Promise<Producto | null> => {
-  return mobileDataAdapter.getProductoById(id);
+  return dataAccess.getProductoById(id);
 };
 
 export const saveProducto = async (producto: Omit<Producto, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveProducto(producto);
+  return dataAccess.saveProducto(producto);
 };
 
 export const updateProducto = async (id: string, producto: Partial<Producto>): Promise<void> => {
-  return mobileDataAdapter.updateProducto(id, producto);
+  return dataAccess.updateProducto(id, producto);
 };
 
 export const deleteProducto = async (id: string): Promise<void> => {
-  return mobileDataAdapter.deleteProducto(id);
+  return dataAccess.deleteProducto(id);
 };
 
 // ===== PROVEEDORES =====
 
 export const getProveedores = async (): Promise<Proveedor[]> => {
-  return mobileDataAdapter.getProveedores();
+  return dataAccess.getProveedores();
 };
 
 export const getProveedorById = async (id: string): Promise<Proveedor | null> => {
-  return mobileDataAdapter.getProveedorById(id);
+  return dataAccess.getProveedorById(id);
 };
 
 export const saveProveedor = async (proveedor: Omit<Proveedor, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveProveedor(proveedor);
+  return dataAccess.saveProveedor(proveedor);
 };
 
 export const updateProveedor = async (id: string, proveedor: Partial<Proveedor>): Promise<void> => {
-  return mobileDataAdapter.updateProveedor(id, proveedor);
+  return dataAccess.updateProveedor(id, proveedor);
 };
 
 export const deleteProveedor = async (id: string): Promise<void> => {
-  return mobileDataAdapter.deleteProveedor(id);
+  return dataAccess.deleteProveedor(id);
 };
 
 // ===== TAREAS =====
 
 export const getTareas = async (): Promise<Tarea[]> => {
-  return mobileDataAdapter.getTareas();
+  return dataAccess.getTareas();
 };
 
 export const getTareaById = async (id: string): Promise<Tarea | null> => {
-  return mobileDataAdapter.getTareaById(id);
+  return dataAccess.getTareaById(id);
 };
 
 export const saveTarea = async (tarea: Omit<Tarea, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveTarea(tarea);
+  return dataAccess.saveTarea(tarea);
 };
 
 export const updateTarea = async (id: string, tarea: Partial<Tarea>): Promise<void> => {
-  return mobileDataAdapter.updateTarea(id, tarea);
+  return dataAccess.updateTarea(id, tarea);
 };
 
 export const deleteTarea = async (id: string): Promise<void> => {
-  return mobileDataAdapter.deleteTarea(id);
+  return dataAccess.deleteTarea(id);
 };
 
 // ===== USUARIOS =====
 
 export const getUsers = async (): Promise<User[]> => {
-  return mobileDataAdapter.getUsers();
+  return dataAccess.getUsers();
 };
 
 export const saveUser = async (user: Omit<User, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveUser(user);
+  return dataAccess.saveUser(user);
 };
 
 export const updateUser = async (id: string, user: Partial<User>): Promise<void> => {
-  return mobileDataAdapter.updateUser(id, user);
+  return dataAccess.updateUser(id, user);
 };
 
 // ===== RECETAS DE COSTOS =====
 
 export const getRecetasCostos = async (): Promise<RecetaCosto[]> => {
-  return mobileDataAdapter.getRecetasCostos();
+  return dataAccess.getRecetasCostos();
 };
 
 export const getRecetaCostoById = async (id: string): Promise<RecetaCosto | null> => {
-  return mobileDataAdapter.getRecetaCostoById(id);
+  return dataAccess.getRecetaCostoById(id);
 };
 
 export const saveRecetaCosto = async (receta: Omit<RecetaCosto, 'id'>): Promise<string> => {
-  return mobileDataAdapter.saveRecetaCosto(receta);
+  return dataAccess.saveRecetaCosto(receta);
 };
 
 export const updateRecetaCosto = async (id: string, receta: Partial<RecetaCosto>): Promise<void> => {
-  return mobileDataAdapter.updateRecetaCosto(id, receta);
+  return dataAccess.updateRecetaCosto(id, receta);
 };
 
 export const deleteRecetaCosto = async (id: string): Promise<void> => {
-  return mobileDataAdapter.deleteRecetaCosto(id);
+  return dataAccess.deleteRecetaCosto(id);
 };
 
-// ===== MÉTODOS ESPECÍFICOS PARA MÓVIL =====
+// ===== FUNCIONES ESPECÍFICAS PARA MÓVIL =====
+
+// Obtener órdenes por rol de usuario
+export const getOrdenesByUserRole = async (user: User, callback: (ordenes: Orden[]) => void): Promise<void> => {
+  return dataAccess.getOrdenesByUserRole(user, callback);
+};
+
+// Obtener tareas por rol de usuario
+export const getTareasByUserRole = async (user: User, callback: (tareas: Tarea[]) => void): Promise<void> => {
+  return dataAccess.getTareasByUserRole(user, callback);
+};
 
 // Obtener órdenes con información de proveedores resuelta
 export const getOrdenesConProveedores = async (): Promise<(Orden & { proveedor?: Proveedor })[]> => {
-  return mobileDataAdapter.getOrdenesConProveedores();
+  return dataAccess.getOrdenesConProveedores();
 };
 
 // Obtener productos con información de proveedores resuelta
 export const getProductosConProveedores = async (): Promise<(Producto & { proveedor?: Proveedor })[]> => {
-  return mobileDataAdapter.getProductosConProveedores();
+  return dataAccess.getProductosConProveedores();
 };
 
 // Buscar proveedor por ID
 export const findProveedorById = async (proveedorId: string): Promise<Proveedor | null> => {
-  return mobileDataAdapter.findProveedorById(proveedorId);
+  return dataAccess.findProveedorById(proveedorId);
 };
 
 // Buscar producto por ID
 export const findProductoById = async (productoId: string): Promise<Producto | null> => {
-  return mobileDataAdapter.findProductoById(productoId);
+  return dataAccess.findProductoById(productoId);
+};
+
+// ===== FUNCIONES ESPECÍFICAS PARA WEB =====
+
+// Obtener datos completos para el dashboard
+export const getDashboardData = async () => {
+  return dataAccess.getDashboardData();
+};
+
+// Obtener estadísticas del dashboard
+export const getDashboardStats = async () => {
+  return dataAccess.getDashboardStats();
 };
 
 // ===== LISTENERS EN TIEMPO REAL =====
 
 export const onOrdenesChange = (callback: (ordenes: Orden[]) => void): (() => void) => {
-  return mobileDataAdapter.onOrdenesChange(callback);
+  return dataAccess.onOrdenesChange(callback);
 };
 
 export const onProveedoresChange = (callback: (proveedores: Proveedor[]) => void): (() => void) => {
-  return mobileDataAdapter.onProveedoresChange(callback);
+  return dataAccess.onProveedoresChange(callback);
 };
 
 export const onProductosChange = (callback: (productos: Producto[]) => void): (() => void) => {
-  return mobileDataAdapter.onProductosChange(callback);
+  return dataAccess.onProductosChange(callback);
 };
 
 export const onTareasChange = (callback: (tareas: Tarea[]) => void): (() => void) => {
-  return mobileDataAdapter.onTareasChange(callback);
+  return dataAccess.onTareasChange(callback);
 };
 
 // ===== NOTIFICACIONES (ESPECÍFICO PARA MÓVIL) =====
