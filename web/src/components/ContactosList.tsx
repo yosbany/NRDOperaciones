@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { Proveedor } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getProveedores, saveProveedor, updateProveedor, deleteProveedor, Proveedor } from '../services/firebaseUnified';
 
 const ContactosList: React.FC = () => {
   const { user } = useAuth();
@@ -19,10 +20,18 @@ const ContactosList: React.FC = () => {
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
-      getProveedores((proveedoresData) => {
-        setProveedores(proveedoresData);
-        setLoading(false);
-      });
+      const loadProveedores = async () => {
+        try {
+          const proveedoresData = await dataAccess.getProveedores();
+          setProveedores(proveedoresData);
+        } catch (error) {
+          console.error('Error cargando proveedores:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadProveedores();
     }
   }, [user]);
 
@@ -36,9 +45,9 @@ const ContactosList: React.FC = () => {
       };
 
       if (editingProveedor) {
-        await updateProveedor(editingProveedor.id, { ...editingProveedor, ...proveedorData });
+        await dataAccess.updateProveedor(editingProveedor.id, { ...editingProveedor, ...proveedorData });
       } else {
-        await saveProveedor(proveedorData);
+        await dataAccess.saveProveedor(proveedorData);
       }
 
       setShowForm(false);
@@ -72,7 +81,7 @@ const ContactosList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este contacto?')) {
       try {
-        await deleteProveedor(id);
+        await dataAccess.deleteProveedor(id);
       } catch (error) {
         console.error('Error eliminando proveedor:', error);
       }

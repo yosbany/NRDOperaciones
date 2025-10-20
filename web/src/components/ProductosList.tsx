@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { Producto } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getProductos, saveProducto, updateProducto, deleteProducto, Producto } from '../services/firebaseUnified';
 
 const ProductosList: React.FC = () => {
   const { user } = useAuth();
@@ -19,10 +20,18 @@ const ProductosList: React.FC = () => {
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
-      getProductos((productosData) => {
-        setProductos(productosData);
-        setLoading(false);
-      });
+      const loadProductos = async () => {
+        try {
+          const productosData = await dataAccess.getProductos();
+          setProductos(productosData);
+        } catch (error) {
+          console.error('Error cargando productos:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadProductos();
     }
   }, [user]);
 
@@ -40,9 +49,9 @@ const ProductosList: React.FC = () => {
       };
 
       if (editingProducto) {
-        await updateProducto(editingProducto.id, { ...editingProducto, ...productoData });
+        await dataAccess.updateProducto(editingProducto.id, { ...editingProducto, ...productoData });
       } else {
-        await saveProducto(productoData);
+        await dataAccess.saveProducto(productoData);
       }
 
       setShowForm(false);
@@ -76,7 +85,7 @@ const ProductosList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       try {
-        await deleteProducto(id);
+        await dataAccess.deleteProducto(id);
       } catch (error) {
         console.error('Error eliminando producto:', error);
       }

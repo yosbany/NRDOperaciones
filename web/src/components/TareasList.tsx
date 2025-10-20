@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { Tarea } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getTareas, saveTarea, updateTarea, deleteTarea, Tarea } from '../services/firebaseUnified';
 
 const TareasList: React.FC = () => {
   const { user } = useAuth();
@@ -18,10 +19,34 @@ const TareasList: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      getTareasByUserRole(user, filter, (tareasData) => {
-        setTareas(tareasData);
-        setLoading(false);
-      });
+      const loadTareas = async () => {
+        try {
+          const tareasData = await dataAccess.getTareas();
+          
+          // Filtrar tareas según el rol del usuario y filtro
+          let tareasFiltradas = tareasData;
+          
+          if (user.role === 'PRODUCTOR' && user.contactId) {
+            // Los productores solo ven tareas asignadas a ellos
+            tareasFiltradas = tareasData.filter(tarea => tarea.asignadoA === user.contactId);
+          }
+          
+          if (filter === 'mis' && user.role === 'PRODUCTOR') {
+            // Ya filtrado por arriba
+          } else if (filter === 'mis') {
+            // Para otros roles, mostrar solo las tareas asignadas al usuario actual
+            tareasFiltradas = tareasData.filter(tarea => tarea.usuarioAsignado === user.username);
+          }
+          
+          setTareas(tareasFiltradas);
+        } catch (error) {
+          console.error('Error cargando tareas:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadTareas();
     }
   }, [user, filter]);
 
@@ -37,7 +62,7 @@ const TareasList: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await saveTarea(tareaData);
+      await dataAccess.saveTarea(tareaData);
       setShowForm(false);
       setFormData({
         titulo: '',
@@ -64,7 +89,7 @@ const TareasList: React.FC = () => {
         updates.fechaCompletada = undefined;
       }
       
-      await updateTarea(tareaId, updates);
+      await dataAccess.updateTarea(tareaId, updates);
     } catch (error) {
       console.error('Error actualizando tarea:', error);
     }
@@ -73,7 +98,7 @@ const TareasList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
       try {
-        await deleteTarea(id);
+        await dataAccess.deleteTarea(id);
       } catch (error) {
         console.error('Error eliminando tarea:', error);
       }

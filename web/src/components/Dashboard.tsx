@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { Orden, Producto, Proveedor, Tarea } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrdenes, getProductos, getProveedores, getTareas, getDashboardStats, Orden, Producto, Proveedor, Tarea } from '../services/firebaseUnified';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -12,16 +13,34 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      // Cargar datos según el rol del usuario
-      getOrdenes(setOrdenes);
-      getTareas(setTareas);
+      const loadData = async () => {
+        try {
+          // Cargar datos según el rol del usuario
+          const [ordenesData, tareasData] = await Promise.all([
+            dataAccess.getOrdenes(),
+            dataAccess.getTareas()
+          ]);
+          
+          setOrdenes(ordenesData);
+          setTareas(tareasData);
+          
+          if (user.role === 'ADMIN') {
+            const [proveedoresData, productosData] = await Promise.all([
+              dataAccess.getProveedores(),
+              dataAccess.getProductos()
+            ]);
+            
+            setProveedores(proveedoresData);
+            setProductos(productosData);
+          }
+        } catch (error) {
+          console.error('Error cargando datos del dashboard:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
       
-      if (user.role === 'ADMIN') {
-        getProveedores(setProveedores);
-        getProductos(setProductos);
-      }
-      
-      setLoading(false);
+      loadData();
     }
   }, [user]);
 

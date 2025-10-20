@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { RecetaCosto } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getRecetasCostos, saveRecetaCosto, updateRecetaCosto, deleteRecetaCosto, RecetaCosto } from '../services/firebaseUnified';
 
 const CostosList: React.FC = () => {
   const { user } = useAuth();
@@ -16,10 +17,18 @@ const CostosList: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      getRecetasCostos((recetasData) => {
-        setRecetas(recetasData);
-        setLoading(false);
-      });
+      const loadRecetas = async () => {
+        try {
+          const recetasData = await dataAccess.getRecetasCostos();
+          setRecetas(recetasData);
+        } catch (error) {
+          console.error('Error cargando recetas de costos:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadRecetas();
     }
   }, [user]);
 
@@ -38,9 +47,9 @@ const CostosList: React.FC = () => {
       };
 
       if (editingReceta) {
-        await updateRecetaCosto(editingReceta.id, { ...editingReceta, ...recetaData });
+        await dataAccess.updateRecetaCosto(editingReceta.id, { ...editingReceta, ...recetaData });
       } else {
-        await saveRecetaCosto(recetaData);
+        await dataAccess.saveRecetaCosto(recetaData);
       }
 
       setShowForm(false);
@@ -73,7 +82,7 @@ const CostosList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta receta?')) {
       try {
-        await deleteRecetaCosto(id);
+        await dataAccess.deleteRecetaCosto(id);
       } catch (error) {
         console.error('Error eliminando receta:', error);
       }

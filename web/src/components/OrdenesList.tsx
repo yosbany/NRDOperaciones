@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { dataAccess } from '../../../shared/services/dataAccess';
+import { Orden } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrdenes, updateOrden, Orden } from '../services/firebaseUnified';
 
 const OrdenesList: React.FC = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const OrdenesList: React.FC = () => {
     const loadOrdenes = async () => {
       if (user) {
         try {
-          const ordenesData = await getOrdenes();
+          const ordenesData = await dataAccess.getOrdenes();
           setOrdenes(ordenesData);
         } catch (error) {
           console.error('Error cargando órdenes:', error);
@@ -27,10 +28,13 @@ const OrdenesList: React.FC = () => {
 
   const handleUpdateEstado = async (ordenId: string, nuevoEstado: string) => {
     try {
-      const orden = ordenes.find(o => o.id === ordenId);
-      if (orden) {
-        await updateOrden(ordenId, { ...orden, estado: nuevoEstado });
-      }
+      await dataAccess.updateOrden(ordenId, { estado: nuevoEstado });
+      // Actualizar el estado local
+      setOrdenes(prevOrdenes => 
+        prevOrdenes.map(orden => 
+          orden.id === ordenId ? { ...orden, estado: nuevoEstado } : orden
+        )
+      );
     } catch (error) {
       console.error('Error actualizando orden:', error);
     }
@@ -151,7 +155,7 @@ const OrdenesList: React.FC = () => {
                       fontSize: '0.9rem'
                     }}>
                       <span>{producto.nombre}</span>
-                      <span>{producto.cantidad} {producto.unidad} - ${producto.subtotal.toFixed(2)}</span>
+                      <span>{producto.cantidad} {producto.unidad} - ${((producto.precio || 0) * parseFloat(producto.cantidad)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

@@ -1,7 +1,8 @@
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, getUserByUid, loginWithFirebase, logout as logoutFirebase } from '../services/firebaseUnified';
+import { dataAccess } from '../../../shared/services/dataAccess';
 import { auth } from '../../../shared/services/firebaseConfig';
+import { User } from '../../../shared/services/types';
 
 interface AuthContextType {
   user: User | null;
@@ -32,7 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const userData = await getUserByUid(firebaseUser.uid);
+          const userData = await dataAccess.getUserByUid(firebaseUser.uid);
           setUser(userData);
         } catch (error) {
           console.error('Error obteniendo datos del usuario:', error);
@@ -49,7 +50,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const userData = await loginWithFirebase(email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userData = await dataAccess.getUserByUid(userCredential.user.uid);
       setUser(userData);
     } catch (error) {
       console.error('Error en login:', error);
@@ -59,7 +61,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await logoutFirebase();
+      await signOut(auth);
       setUser(null);
     } catch (error) {
       console.error('Error en logout:', error);
