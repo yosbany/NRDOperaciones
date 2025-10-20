@@ -1,8 +1,8 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
 import { auth } from '../../../shared/services/firebaseConfig';
-import { User } from '../../../shared/services/types';
 
 interface AuthContextType {
   user: User | null;

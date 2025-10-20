@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { RecetaCosto } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { RecetaCosto } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const CostosList: React.FC = () => {

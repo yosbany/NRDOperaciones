@@ -4,7 +4,7 @@
 export { auth, database } from './firebaseConfig';
 
 // Tipos
-export * from './types';
+export * from '../models';
 
 // Capa de acceso a datos
 export { DataAccessLayer, dataAccess } from './dataAccess';

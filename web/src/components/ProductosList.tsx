@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Producto } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Producto } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProductosList: React.FC = () => {
@@ -14,8 +14,7 @@ const ProductosList: React.FC = () => {
     precio: '',
     stock: '',
     unidad: '',
-    proveedorId: '',
-    proveedorNombre: ''
+    proveedorId: ''
   });
 
   useEffect(() => {
@@ -42,10 +41,7 @@ const ProductosList: React.FC = () => {
         ...formData,
         precio: parseFloat(formData.precio),
         stock: parseFloat(formData.stock),
-        orden: productos.length + 1,
-        archivado: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        orden: productos.length + 1
       };
 
       if (editingProducto) {
@@ -61,8 +57,7 @@ const ProductosList: React.FC = () => {
         precio: '',
         stock: '',
         unidad: '',
-        proveedorId: '',
-        proveedorNombre: ''
+        proveedorId: ''
       });
     } catch (error) {
       console.error('Error guardando producto:', error);
@@ -76,8 +71,7 @@ const ProductosList: React.FC = () => {
       precio: producto.precio.toString(),
       stock: producto.stock.toString(),
       unidad: producto.unidad,
-      proveedorId: producto.proveedorId,
-      proveedorNombre: producto.proveedorNombre
+      proveedorId: producto.proveedorId || ''
     });
     setShowForm(true);
   };
@@ -244,24 +238,6 @@ const ProductosList: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                Nombre Proveedor:
-              </label>
-              <input
-                type="text"
-                value={formData.proveedorNombre}
-                onChange={(e) => setFormData({ ...formData, proveedorNombre: e.target.value })}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '1rem'
-                }}
-              />
-            </div>
 
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button
@@ -274,8 +250,7 @@ const ProductosList: React.FC = () => {
                     precio: '',
                     stock: '',
                     unidad: '',
-                    proveedorId: '',
-                    proveedorNombre: ''
+                    proveedorId: ''
                   });
                 }}
                 style={{
@@ -347,20 +322,7 @@ const ProductosList: React.FC = () => {
                       <strong>Stock:</strong> {producto.stock} {producto.unidad}
                     </div>
                     <div>
-                      <strong>Proveedor:</strong> {producto.proveedorNombre}
-                    </div>
-                    <div>
-                      <strong>Estado:</strong> 
-                      <span style={{
-                        background: producto.archivado ? '#dc3545' : '#28a745',
-                        color: 'white',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '4px',
-                        fontSize: '0.8rem',
-                        marginLeft: '0.5rem'
-                      }}>
-                        {producto.archivado ? 'Archivado' : 'Activo'}
-                      </span>
+                      <strong>Proveedor ID:</strong> {producto.proveedorId || 'Sin proveedor'}
                     </div>
                   </div>
                 </div>

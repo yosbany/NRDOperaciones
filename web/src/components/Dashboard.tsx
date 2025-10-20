@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Orden, Producto, Proveedor, Tarea } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Orden, Producto, Proveedor, Tarea } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const Dashboard: React.FC = () => {
@@ -194,10 +194,10 @@ const Dashboard: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                     <div>
                       <h4 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>
-                        {orden.proveedorNombre}
+                        Orden #{orden.id}
                       </h4>
                       <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>
-                        {orden.fecha} • {orden.productos.length} productos
+                        {orden.fecha} • {orden.getProductos().length} productos
                       </p>
                       <span style={{
                         background: orden.estado === 'PENDIENTE' ? '#ffc107' : '#28a745',
@@ -211,7 +211,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333' }}>
-                        ${(orden.total || 0).toFixed(2)}
+                        ${orden.calcularTotal().toFixed(2)}
                       </div>
                     </div>
                   </div>

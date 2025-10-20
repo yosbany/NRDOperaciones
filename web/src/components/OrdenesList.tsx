@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Orden } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Orden } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const OrdenesList: React.FC = () => {
@@ -28,11 +28,27 @@ const OrdenesList: React.FC = () => {
 
   const handleUpdateEstado = async (ordenId: string, nuevoEstado: string) => {
     try {
-      await dataAccess.updateOrden(ordenId, { estado: nuevoEstado });
+      // Obtener la orden actual
+      const ordenActual = ordenes.find(o => o.id === ordenId);
+      if (!ordenActual) return;
+      
+      // Crear una nueva instancia de Orden con el estado actualizado
+      const ordenActualizada = new Orden(
+        ordenActual.id,
+        nuevoEstado,
+        ordenActual.fecha,
+        ordenActual.hecha,
+        ordenActual.proveedorId,
+        ordenActual.getProductos(),
+        ordenActual.tipo
+      );
+      
+      await dataAccess.updateOrden(ordenId, ordenActualizada);
+      
       // Actualizar el estado local
       setOrdenes(prevOrdenes => 
         prevOrdenes.map(orden => 
-          orden.id === ordenId ? { ...orden, estado: nuevoEstado } : orden
+          orden.id === ordenId ? ordenActualizada : orden
         )
       );
     } catch (error) {
@@ -112,20 +128,18 @@ const OrdenesList: React.FC = () => {
               }}>
                 <div>
                   <h3 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>
-                    {orden.proveedorNombre}
+                    Orden #{orden.id}
                   </h3>
                   <p style={{ margin: '0 0 0.5rem 0', color: '#666' }}>
-                    {orden.fecha} • {orden.productos.length} productos
+                    {orden.fecha} • {orden.getProductos().length} productos
                   </p>
-                  {orden.observaciones && (
-                    <p style={{ margin: '0 0 0.5rem 0', color: '#666', fontSize: '0.9rem' }}>
-                      {orden.observaciones}
-                    </p>
-                  )}
+                  <p style={{ margin: '0 0 0.5rem 0', color: '#888', fontSize: '0.9rem' }}>
+                    Proveedor ID: {orden.proveedorId}
+                  </p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#333', marginBottom: '0.5rem' }}>
-                    ${orden.total.toFixed(2)}
+                    ${orden.calcularTotal().toFixed(2)}
                   </div>
                   <span style={{
                     background: orden.estado === 'PENDIENTE' ? '#ffc107' : 
@@ -145,7 +159,7 @@ const OrdenesList: React.FC = () => {
               <div style={{ marginBottom: '1rem' }}>
                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#333', fontSize: '1rem' }}>Productos:</h4>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {orden.productos.map((producto, index) => (
+                  {orden.getProductos().map((producto, index) => (
                     <div key={index} style={{
                       display: 'flex',
                       justifyContent: 'space-between',

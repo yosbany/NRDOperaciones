@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Proveedor } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Proveedor } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const ContactosList: React.FC = () => {

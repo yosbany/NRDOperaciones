@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Tarea } from '../../../shared/models';
 import { dataAccess } from '../../../shared/services/dataAccess';
-import { Tarea } from '../../../shared/services/types';
 import { useAuth } from '../contexts/AuthContext';
 
 const TareasList: React.FC = () => {
@@ -373,7 +373,7 @@ const TareasList: React.FC = () => {
                   </p>
                   <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem', color: '#666' }}>
                     <span><strong>Asignada a:</strong> {tarea.usuarioAsignado}</span>
-                    <span><strong>Creada:</strong> {new Date(tarea.createdAt).toLocaleDateString()}</span>
+                    <span><strong>Creada:</strong> {new Date(tarea.fechaCreacion || '').toLocaleDateString()}</span>
                     {tarea.fechaCompletada && (
                       <span><strong>Completada:</strong> {new Date(tarea.fechaCompletada).toLocaleDateString()}</span>
                     )}
