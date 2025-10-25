@@ -9,8 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build:web": "node scripts/build-web.js",
-    "build:github-pages": "npx expo export --platform web --output-dir dist && touch dist/.nojekyll"
+    "build:web": "npx expo export --platform web --output-dir dist && touch dist/.nojekyll"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
