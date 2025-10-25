@@ -38,10 +38,76 @@ function processDirectory(dir) {
   }
 }
 
+// Función para agregar CSS de fuentes a los archivos HTML
+function addFontsCSS() {
+  console.log('🎨 Agregando CSS de fuentes de iconos...');
+  
+  const fontCSS = `
+<style>
+/* Fuentes de iconos para GitHub Pages */
+@font-face {
+  font-family: 'Ionicons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ionicons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'FontAwesome';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MaterialIcons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MaterialCommunityIcons';
+  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+</style>`;
+
+  const htmlFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html', 'costos.html'];
+  
+  htmlFiles.forEach(file => {
+    if (fs.existsSync(file)) {
+      let content = fs.readFileSync(file, 'utf8');
+      
+      // Insertar el CSS antes del cierre de </head>
+      content = content.replace('</head>', fontCSS + '\n</head>');
+      
+      fs.writeFileSync(file, content);
+      console.log(`✅ CSS de fuentes agregado a ${file}`);
+    }
+  });
+}
+
 try {
   // Procesar archivos en la raíz
   const rootFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html', 'costos.html'];
   rootFiles.forEach(file => fixPathsInFile(file));
+  
+  // Agregar CSS de fuentes a los archivos HTML
+  addFontsCSS();
   
   // Procesar directorios
   processDirectory('./_expo');
