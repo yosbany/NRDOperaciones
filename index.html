@@ -4,12 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NRD Operaciones</title>
-    <script>
-        // Redirigir a la aplicación en la carpeta dist
-        window.location.href = './dist/';
-    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+        }
+        .loading {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-    <p>Redirigiendo a la aplicación...</p>
+    <div class="container">
+        <h1>🚀 NRD Operaciones</h1>
+        <p>Aplicación de gestión de operaciones</p>
+        <div id="loading" class="loading">
+            <p>Cargando aplicación...</p>
+        </div>
+        <a href="./dist/" class="btn" onclick="showLoading()">Acceder a la Aplicación</a>
+    </div>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            // Redirigir después de un breve delay
+            setTimeout(() => {
+                window.location.replace('./dist/');
+            }, 1000);
+        }
+        
+        // Auto-redirigir si se accede directamente
+        if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+            setTimeout(() => {
+                window.location.replace('./dist/');
+            }, 2000);
+        }
+    </script>
 </body>
 </html>
