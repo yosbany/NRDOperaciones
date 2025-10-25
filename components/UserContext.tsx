@@ -1,5 +1,5 @@
 import React, { createContext, ReactNode, useContext } from 'react';
-import { User } from '../services/firebaseUnified';
+import { User } from '../services/firebaseService';
 
 // Definir el tipo del contexto
 interface UserContextType {

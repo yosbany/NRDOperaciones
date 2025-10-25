@@ -1,6 +1,6 @@
 import { off, onValue, ref } from 'firebase/database';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { database } from '../shared/services/firebaseConfig';
+import { database } from '../services/firebaseService';
 
 // Cache global para evitar múltiples listeners del mismo path
 const globalCache = new Map();

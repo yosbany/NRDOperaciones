@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 // import { useFocusEffect, useRoute } from '@react-navigation/native'; // Removed to fix LinkPreviewContext error
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+// Notificaciones eliminadas
 // import { useRouter } from 'expo-router'; // Removed to fix filename error
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
@@ -15,7 +15,7 @@ import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
 import { ESTADOS_ORDEN, ESTADOS_ORDEN_ARRAY } from '../../constants/Ordenes';
 import { ORDENES_TIPOS, ORDENES_TIPOS_ICONS } from '../../constants/OrdenesTipos';
-import { deleteOrden, generarSugerenciasOrden, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, getProveedorNombre, logEvento, Orden, Producto, Proveedor, saveOrden, setupRealtimeNotifications, updateOrden, updateProductosOrdenBatch } from '../../services/firebaseUnified';
+import { deleteOrden, generarSugerenciasOrden, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, logEvento, Orden, Producto, Proveedor, saveOrden, updateOrden, updateProductosOrdenBatch } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 // Constante para convertir unidades a abreviaturas más cortas
@@ -238,33 +238,12 @@ async function notificarOrdenPendiente(ordenCreada: Orden, proveedores: Proveedo
     const proveedor = proveedores.find(p => p.id === ordenCreada.proveedorId);
     const nombreProveedor = proveedor?.nombre || 'Proveedor desconocido';
     
-    // Usar NotificationManager para control de duplicados
-    const NotificationManager = (await import('../../services/notificationManager')).default;
-    const notificationManager = NotificationManager.getInstance();
+    // Notificaciones eliminadas
     
     // Crear un ID único para esta notificación
     const notificationId = `orden_inmediata_${ordenCreada.id}`;
     
-    // Usar la función centralizada del NotificationManager
-    const sent = await notificationManager.scheduleNotification(
-      '¡Nueva orden pendiente!',
-      `Orden creada para: ${nombreProveedor}`,
-      'orden_pendiente_inmediata',
-      notificationId,
-      null, // Inmediata
-      { 
-        proveedorId: ordenCreada.proveedorId,
-        ordenId: ordenCreada.id,
-        timestamp: new Date().toISOString()
-      },
-      30000
-    );
-    
-    if (sent) {
-      console.log(`✅ Notificación inmediata enviada para orden de: ${nombreProveedor}`);
-    } else {
-      console.log(`🚫 Notificación inmediata de orden ya enviada, evitando duplicado: ${ordenCreada.id}`);
-    }
+    // Notificación eliminada
   } catch (error) {
     console.error('❌ Error enviando notificación inmediata:', error);
   }
@@ -2371,14 +2350,16 @@ export default function OrdenesScreen() {
     async function programarNotificacionesOrdenesPendientes() {
       try {
         // Cancela notificaciones previas de órdenes
-        const notificacionesProgramadas = await Notifications.getAllScheduledNotificationsAsync();
+        // Notificaciones eliminadas
+        const notificacionesProgramadas: any[] = [];
         const notificacionesOrdenes = notificacionesProgramadas.filter(n => 
           n.content.data?.type === 'orden_pendiente_programada' || 
           n.content.data?.type === 'orden_pendiente_manana'
         );
         
         for (const notif of notificacionesOrdenes) {
-          await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+          // Notificación cancelada
+          // await Notifications.cancelScheduledNotificationAsync(notif.identifier);
         }
         
         console.log(`🧹 ${notificacionesOrdenes.length} notificaciones de órdenes anteriores canceladas`);
@@ -2417,63 +2398,8 @@ export default function OrdenesScreen() {
           
           // Solo programar si la fecha es futura
           if (fecha > now) {
-            // Usar NotificationManager para control de duplicados
-            const NotificationManager = (await import('../../services/notificationManager')).default;
-            const notificationManager = NotificationManager.getInstance();
-            
-            // Crear un ID único para esta notificación programada
-            const notificationId = `orden_programada_${hora}_${hoy}`;
-            
-            // Usar la función centralizada del NotificationManager
-            const scheduled = await notificationManager.scheduleNotification(
-              tituloNotificacion,
-              cuerpoNotificacion,
-              'orden_pendiente_programada',
-              notificationId,
-              { date: fecha },
-              { 
-                cantidad: ordenesPendientesHoy.length,
-                timestamp: fecha.toISOString()
-              },
-              30000
-            );
-            
-            if (scheduled) {
-              console.log(`📱 Notificación programada para: ${fecha.toLocaleString()} - ${cuerpoNotificacion}`);
-            } else {
-              console.log(`🚫 Notificación de orden ya programada para las ${hora}:00, evitando duplicado`);
-            }
+            // Notificación eliminada
           }
-        }
-        
-        // Programar notificación para mañana temprano si hay órdenes pendientes
-        const manana = new Date(now);
-        manana.setDate(manana.getDate() + 1);
-        manana.setHours(8, 0, 0, 0);
-        
-        // Usar NotificationManager para control de duplicados
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        const mananaNotificationId = `orden_manana_${manana.toISOString().split('T')[0]}`;
-        
-        const mananaScheduled = await notificationManager.scheduleNotification(
-          '📦 Recordatorio de órdenes pendientes',
-          `Tienes ${ordenesPendientesHoy.length} orden${ordenesPendientesHoy.length > 1 ? 'es' : ''} pendiente${ordenesPendientesHoy.length > 1 ? 's' : ''} para hoy`,
-          'orden_pendiente_manana',
-          mananaNotificationId,
-          { date: manana },
-          { 
-            cantidad: ordenesPendientesHoy.length,
-            timestamp: manana.toISOString()
-          },
-          30000
-        );
-        
-        if (mananaScheduled) {
-          console.log(`📱 Notificación de recordatorio de órdenes programada para mañana: ${manana.toLocaleString()}`);
-        } else {
-          console.log(`🚫 Notificación de órdenes de mañana ya programada, evitando duplicado`);
         }
         
         console.log('✅ Notificaciones programadas exitosamente');
@@ -2491,72 +2417,13 @@ export default function OrdenesScreen() {
 
     console.log('🔔 Configurando notificaciones en tiempo real para órdenes...');
 
-    // Función para manejar notificaciones de órdenes en tiempo real
-    const handleOrdenNotification = async (orden: Orden) => {
-      try {
-        const nombreProveedor = await getProveedorNombre(orden.proveedorId);
-        
-        // Importar el NotificationManager dinámicamente
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        // Usar el NotificationManager para enviar notificación con control de duplicados
-        await notificationManager.sendLocalNotification(
-          '🔔 Nueva orden pendiente',
-          `Orden creada para: ${nombreProveedor}`,
-          'nueva_orden_realtime',
-          orden.id,
-          { 
-            type: 'orden_pendiente_realtime',
-            ordenId: orden.id,
-            proveedorId: orden.proveedorId,
-            timestamp: new Date().toISOString()
-          },
-          30000 // Cooldown de 30 segundos
-        );
-        
-        console.log(`✅ Notificación en tiempo real procesada para orden: ${orden.id}`);
-      } catch (error) {
-        console.error('❌ Error enviando notificación en tiempo real:', error);
-      }
-    };
+    // Función de notificaciones eliminada
 
-    // Función para manejar notificaciones de tareas en tiempo real
-    const handleTareaNotification = async (tarea: any) => {
-      try {
-        // Importar el NotificationManager dinámicamente
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        // Usar el NotificationManager para enviar notificación con control de duplicados
-        await notificationManager.sendLocalNotification(
-          '🔔 Nueva tarea asignada',
-          `Tarea: ${tarea.titulo}`,
-          'nueva_tarea_realtime',
-          tarea.id,
-          { 
-            type: 'tarea_pendiente_realtime',
-            tareaId: tarea.id,
-            timestamp: new Date().toISOString()
-          },
-          30000 // Cooldown de 30 segundos
-        );
-        
-        console.log(`✅ Notificación en tiempo real procesada para tarea: ${tarea.id}`);
-      } catch (error) {
-        console.error('❌ Error enviando notificación en tiempo real de tarea:', error);
-      }
-    };
+    // Función de notificaciones eliminada
 
-    // Configurar listeners de Firebase
-    const cleanup = setupRealtimeNotifications(
-      userData,
-      handleOrdenNotification,
-      handleTareaNotification
-    );
+    // Configuración de notificaciones eliminada
 
-    // Limpiar listeners al desmontar el componente
-    return cleanup;
+    // Limpieza de notificaciones eliminada
   }, [userData]);
 
   return (

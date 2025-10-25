@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TabRestrictedAccess from '../../components/TabRestrictedAccess';
 import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
-import { canAccessTab, deleteProveedor, getOrdenes, getProductos, getProductosDefaultCliente, getProveedores, logEvento, Producto, Proveedor, saveProveedor, updateProductosDefaultCliente, updateProveedor } from '../../services/firebaseUnified';
+import { canAccessTab, deleteProveedor, getOrdenes, getProductos, getProductosDefaultCliente, getProveedores, logEvento, Producto, Proveedor, saveProveedor, updateProductosDefaultCliente, updateProveedor } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 type ProveedorWithCelular = Proveedor & { celular?: string; tipo?: string; salarioPorDia?: number };

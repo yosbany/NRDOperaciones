@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/Colors';
-import { logout } from '../services/firebaseUnified';
+import { logout } from '../services/firebaseService';
 import { useUser } from './UserContext';
 
 export default function UserNotActive() {

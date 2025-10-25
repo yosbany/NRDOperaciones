@@ -3,7 +3,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 // import { useFocusEffect } from '@react-navigation/native'; // Removed to fix LinkPreviewContext error
-import * as Notifications from 'expo-notifications';
+// Notificaciones eliminadas
 // import { useRouter } from 'expo-router'; // Removed to fix filename error
 import { ref as dbRef, getDatabase, onValue } from 'firebase/database';
 import { useEffect, useState } from 'react';
@@ -13,8 +13,7 @@ import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
 import { APP_CONFIG, USER_ROLES } from '../../constants/Config';
 import { ESTADOS_ORDEN } from '../../constants/Ordenes';
-import { completarTarea as completarTareaFirebase, deleteTarea, getOrdenes, getOrdenesByUserRole, getProductos, getProveedores, getProveedorNombre, getTareasByUserRole, getUsuariosParaAsignacion, logout, Orden, Producto, Proveedor, reactivarTarea as reactivarTareaFirebase, saveTarea, setupRealtimeNotifications, Tarea, updateOrden, updateTarea } from '../../services/firebaseUnified';
-import { auth } from '../../shared/services/firebaseConfig';
+import { auth, completarTarea as completarTareaFirebase, deleteTarea, getOrdenes, getOrdenesByUserRole, getProductos, getProveedores, getTareasByUserRole, getUsuariosParaAsignacion, logout, Orden, Producto, Proveedor, reactivarTarea as reactivarTareaFirebase, saveTarea, Tarea, updateOrden, updateTarea } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 // Componente Header
@@ -441,36 +440,8 @@ export default function InicioScreen() {
 
   // Función para notificar tarea pendiente inmediata
   const notificarTareaPendiente = async (tareaCreada: Tarea) => {
-    try {
-      // Usar NotificationManager para control de duplicados
-      const NotificationManager = (await import('../../services/notificationManager')).default;
-      const notificationManager = NotificationManager.getInstance();
-      
-      // Crear un ID único para esta notificación
-      const notificationId = `tarea_inmediata_${tareaCreada.id}`;
-      
-      // Usar la función centralizada del NotificationManager
-      const sent = await notificationManager.scheduleNotification(
-        '¡Nueva tarea asignada!',
-        `Tarea: ${tareaCreada.titulo}`,
-        'tarea_pendiente_inmediata',
-        notificationId,
-        null, // Inmediata
-        { 
-          tareaId: tareaCreada.id,
-          timestamp: new Date().toISOString()
-        },
-        30000
-      );
-      
-      if (sent) {
-        console.log(`✅ Notificación inmediata enviada para tarea: ${tareaCreada.titulo}`);
-      } else {
-        console.log(`🚫 Notificación inmediata de tarea ya enviada, evitando duplicado: ${tareaCreada.id}`);
-      }
-    } catch (error) {
-      console.error('❌ Error enviando notificación inmediata de tarea:', error);
-    }
+    // Notificación eliminada
+    console.log('📱 Notificación de tarea eliminada:', tareaCreada.titulo);
   };
 
   // Función para completar una tarea usando Firebase
@@ -760,113 +731,15 @@ export default function InicioScreen() {
     console.log(`📋 Tareas pendientes:`, tareasPendientes.map(t => ({ id: t.id, titulo: t.titulo, completada: t.completada })));
 
     async function programarNotificacionesTareasPendientes() {
-      try {
-        // Cancela notificaciones previas de tareas
-        const notificacionesProgramadas = await Notifications.getAllScheduledNotificationsAsync();
-        const notificacionesTareas = notificacionesProgramadas.filter(n => 
-          n.content.data?.type === 'tarea_pendiente_programada' || 
-          n.content.data?.type === 'tarea_pendiente_manana'
-        );
-        
-        for (const notif of notificacionesTareas) {
-          await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-        }
-        
-        console.log(`🧹 ${notificacionesTareas.length} notificaciones de tareas anteriores canceladas`);
-        
-        if (tareasPendientes.length === 0) {
-          console.log('📱 No hay tareas pendientes, no se programarán notificaciones');
-          return;
-        }
-
-        console.log('📱 Programando notificaciones cada 30 minutos para tareas pendientes...');
-        
-        const now = new Date();
-        const hoy = now.toISOString().slice(0, 10); // yyyy-mm-dd
-        
-        // Determinar el mensaje de la notificación
-        let tituloNotificacion = '';
-        let cuerpoNotificacion = '';
-        
-        if (tareasPendientes.length === 1) {
-          // Si hay solo una tarea pendiente, mostrar el título
-          tituloNotificacion = '¡Tienes una tarea pendiente!';
-          cuerpoNotificacion = `Tarea: ${tareasPendientes[0].titulo}`;
-        } else {
-          // Si hay múltiples tareas, mostrar la cantidad
-          tituloNotificacion = '¡Tienes tareas pendientes!';
-          cuerpoNotificacion = `${tareasPendientes.length} tareas pendientes`;
-        }
-        
-        // Programar notificaciones cada 4 horas de 8:00 AM a 8:00 PM (menos frecuente)
-        for (let hora = 8; hora <= 20; hora += 4) {
-          const fecha = new Date(`${hoy}T${hora.toString().padStart(2, '0')}:00:00`);
-          
-          // Solo programar si la fecha es futura
-          if (fecha > now) {
-            // Usar NotificationManager para control de duplicados
-            const NotificationManager = (await import('../../services/notificationManager')).default;
-            const notificationManager = NotificationManager.getInstance();
-            
-            // Crear un ID único para esta notificación programada
-            const notificationId = `tarea_programada_${hora}_${hoy}`;
-            
-            // Usar la función centralizada del NotificationManager
-            const scheduled = await notificationManager.scheduleNotification(
-              tituloNotificacion,
-              cuerpoNotificacion,
-              'tarea_pendiente_programada',
-              notificationId,
-              { date: fecha },
-              { 
-                cantidad: tareasPendientes.length,
-                timestamp: fecha.toISOString()
-              },
-              30000
-            );
-            
-            if (scheduled) {
-              console.log(`📱 Notificación de tarea programada para: ${fecha.toLocaleString()} - ${cuerpoNotificacion}`);
-            } else {
-              console.log(`🚫 Notificación de tarea ya programada para las ${hora}:00, evitando duplicado`);
-            }
-          }
-        }
-        
-        // Programar notificación para mañana temprano si hay tareas pendientes
-        const manana = new Date(now);
-        manana.setDate(manana.getDate() + 1);
-        manana.setHours(8, 0, 0, 0);
-        
-        // Usar NotificationManager para control de duplicados
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        const mananaNotificationId = `tarea_manana_${manana.toISOString().split('T')[0]}`;
-        
-        const mananaScheduled = await notificationManager.scheduleNotification(
-          '📋 Recordatorio de tareas pendientes',
-          `Tienes ${tareasPendientes.length} tarea${tareasPendientes.length > 1 ? 's' : ''} pendiente${tareasPendientes.length > 1 ? 's' : ''} para hoy`,
-          'tarea_pendiente_manana',
-          mananaNotificationId,
-          { date: manana },
-          { 
-            cantidad: tareasPendientes.length,
-            timestamp: manana.toISOString()
-          },
-          30000
-        );
-        
-        if (mananaScheduled) {
-          console.log(`📱 Notificación de recordatorio programada para mañana: ${manana.toLocaleString()}`);
-        } else {
-          console.log(`🚫 Notificación de mañana ya programada, evitando duplicado`);
-        }
-        
-        console.log('✅ Notificaciones de tareas programadas exitosamente');
-      } catch (error) {
-        console.error('❌ Error programando notificaciones de tareas:', error);
+      // Notificaciones eliminadas
+      console.log('📱 Notificaciones de tareas eliminadas');
+      
+      if (tareasPendientes.length === 0) {
+        console.log('📱 No hay tareas pendientes');
+        return;
       }
+
+      console.log(`📊 Tareas pendientes: ${tareasPendientes.length}`);
     }
 
     programarNotificacionesTareasPendientes();
@@ -878,72 +751,14 @@ export default function InicioScreen() {
 
     console.log('🔔 Configurando notificaciones en tiempo real para tareas...');
 
-    // Función para manejar notificaciones de órdenes en tiempo real
-    const handleOrdenNotification = async (orden: Orden) => {
-      try {
-        const nombreProveedor = await getProveedorNombre(orden.proveedorId);
-        
-        // Importar el NotificationManager dinámicamente
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        // Usar el NotificationManager para enviar notificación con control de duplicados
-        await notificationManager.sendLocalNotification(
-          '🔔 Nueva orden pendiente',
-          `Orden creada para: ${nombreProveedor}`,
-          'nueva_orden_realtime',
-          orden.id,
-          { 
-            type: 'orden_pendiente_realtime',
-            ordenId: orden.id,
-            proveedorId: orden.proveedorId,
-            timestamp: new Date().toISOString()
-          },
-          30000 // Cooldown de 30 segundos
-        );
-        
-        console.log(`✅ Notificación en tiempo real procesada para orden: ${orden.id}`);
-      } catch (error) {
-        console.error('❌ Error enviando notificación en tiempo real:', error);
-      }
-    };
+    // Función de notificaciones eliminada
 
     // Función para manejar notificaciones de tareas en tiempo real
-    const handleTareaNotification = async (tarea: Tarea) => {
-      try {
-        // Importar el NotificationManager dinámicamente
-        const NotificationManager = (await import('../../services/notificationManager')).default;
-        const notificationManager = NotificationManager.getInstance();
-        
-        // Usar el NotificationManager para enviar notificación con control de duplicados
-        await notificationManager.sendLocalNotification(
-          '🔔 Nueva tarea asignada',
-          `Tarea: ${tarea.titulo}`,
-          'nueva_tarea_realtime',
-          tarea.id,
-          { 
-            type: 'tarea_pendiente_realtime',
-            tareaId: tarea.id,
-            timestamp: new Date().toISOString()
-          },
-          30000 // Cooldown de 30 segundos
-        );
-        
-        console.log(`✅ Notificación en tiempo real procesada para tarea: ${tarea.id}`);
-      } catch (error) {
-        console.error('❌ Error enviando notificación en tiempo real de tarea:', error);
-      }
-    };
+    // Función de notificaciones eliminada
 
-    // Configurar listeners de Firebase
-    const cleanup = setupRealtimeNotifications(
-      userData,
-      handleOrdenNotification,
-      handleTareaNotification
-    );
+    // Configuración de notificaciones eliminada
 
-    // Limpiar listeners al desmontar el componente
-    return cleanup;
+    // Limpieza de notificaciones eliminada
   }, [userData]);
 
   // Recargar datos cuando el componente se monta

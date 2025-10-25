@@ -2,7 +2,6 @@ import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { User as FirebaseAuthUser, onAuthStateChanged } from 'firebase/auth';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,16 +9,8 @@ import CustomTabs from '../components/CustomTabs';
 import RestrictedAccess from '../components/RestrictedAccess';
 import SimpleLogin from '../components/SimpleLogin';
 import UserProvider from '../components/UserContext';
-import { clearAuthState, getUserData, hasValidSession, saveAuthState, saveUserData } from '../services/authStorage';
-import { User, diagnosticarUsuario, getUserByUid, loginWithFirebase, logout, setupFCMForUser } from '../services/firebaseUnified';
-import { auth } from '../shared/services/firebaseConfig';
-// Importación condicional de notificaciones para compatibilidad con Expo Go
-let Notifications: any = null;
-try {
-  Notifications = require('expo-notifications');
-} catch (error) {
-  console.warn('⚠️ expo-notifications no disponible en Expo Go. Se deshabilitarán las notificaciones push.');
-}
+import { User, auth, clearAuthState, createUserInDatabase, getUserByUid, getUserData, hasValidSession, loginWithFirebase, logout, saveAuthState, saveUserData } from '../services/firebaseService';
+// Notificaciones eliminadas
 
 
 export default function RootLayout() {
@@ -82,14 +73,30 @@ export default function RootLayout() {
             
             // Configurar FCM para notificaciones push
             try {
-              await setupFCMForUser(userDataFromFirebase);
+              // FCM eliminado
             } catch (fcmError) {
               console.warn('⚠️ Error configurando FCM:', fcmError);
             }
           } else {
             console.log('⚠️ Usuario de Firebase Auth no encontrado en base de datos');
-            // Limpiar sesión si no hay datos en la base de datos
-            await logout();
+            console.log('👤 Creando usuario automáticamente en base de datos...');
+            
+            try {
+              // Crear usuario en la base de datos
+              const newUser = await createUserInDatabase(
+                currentUser.uid, 
+                currentUser.email || '', 
+                currentUser.displayName || undefined
+              );
+              
+              setUserData(newUser);
+              setIsAuthenticated(true);
+              console.log('✅ Usuario creado automáticamente:', newUser.email, 'Rol:', newUser.role);
+            } catch (createError) {
+              console.error('❌ Error creando usuario automáticamente:', createError);
+              // Limpiar sesión si no se puede crear el usuario
+              await logout();
+            }
           }
         } else {
           console.log('📱 No hay usuario autenticado en Firebase Auth');
@@ -112,7 +119,7 @@ export default function RootLayout() {
               
               // Configurar FCM para notificaciones push
               try {
-                await setupFCMForUser(savedUserData);
+                // FCM eliminado
               } catch (fcmError) {
                 console.warn('⚠️ Error configurando FCM:', fcmError);
               }
@@ -225,26 +232,42 @@ export default function RootLayout() {
             
             // Configurar FCM para notificaciones push
             try {
-              await setupFCMForUser(userDataFromFirebase);
+              // FCM eliminado
             } catch (fcmError) {
               console.warn('⚠️ Error configurando FCM:', fcmError);
             }
           } else {
-            console.log('⚠️ Usuario no encontrado en base de datos, pero manteniendo autenticación');
+            console.log('⚠️ Usuario no encontrado en base de datos');
             console.log('🔍 UID del usuario:', firebaseUser.uid);
             console.log('🔍 Email del usuario:', firebaseUser.email);
+            console.log('👤 Creando usuario automáticamente en base de datos...');
             
-            // Ejecutar diagnóstico para usuarios específicos que están teniendo problemas
-            if (firebaseUser.uid === 'smD4POpJSBeKTmgBSITXJTI2lGV2') {
-              console.log('🔍 Ejecutando diagnóstico para usuario problemático...');
-              await diagnosticarUsuario(firebaseUser.uid);
+            try {
+              // Crear usuario en la base de datos
+              const newUser = await createUserInDatabase(
+                firebaseUser.uid, 
+                firebaseUser.email || '', 
+                firebaseUser.displayName || undefined
+              );
+              
+              setUserData(newUser);
+              setIsAuthenticated(true);
+              console.log('✅ Usuario creado automáticamente:', newUser.email, 'Rol:', newUser.role);
+              
+              // Guardar estado de autenticación y datos del usuario
+              try {
+                await saveAuthState(true);
+                await saveUserData(newUser);
+                console.log('💾 Estado de autenticación y datos del usuario guardados');
+              } catch (storageError) {
+                console.warn('⚠️ Error guardando estado de autenticación:', storageError);
+              }
+            } catch (createError) {
+              console.error('❌ Error creando usuario automáticamente:', createError);
+              // Mantener autenticación pero sin datos de usuario
+              setIsAuthenticated(true);
+              setUserData(null);
             }
-            
-            // NO cerrar sesión automáticamente - mantener la autenticación de Firebase
-            // El usuario puede estar en proceso de creación o puede ser un usuario válido
-            // que aún no se ha sincronizado con la base de datos
-            setIsAuthenticated(true);
-            setUserData(null); // No hay datos de usuario, pero mantiene autenticación
             
             // Intentar obtener datos del usuario desde AsyncStorage como fallback
             try {
@@ -331,73 +354,7 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Configurar y solicitar permisos de notificaciones al iniciar la app
-  useEffect(() => {
-    const configurarNotificaciones = async () => {
-      if (!Notifications) {
-        console.warn('⚠️ Notificaciones no disponibles - saltando configuración');
-        return;
-      }
-      
-      try {
-        // Configurar el comportamiento de las notificaciones
-        Notifications.setNotificationHandler({
-          handleNotification: async (notification) => {
-            console.log('🔔 Notificación recibida:', notification.request.content);
-            
-            // Mostrar notificaciones tanto en foreground como en background
-            // pero con diferentes comportamientos
-            const appState = AppState.currentState;
-            if (appState === 'active') {
-              console.log('📱 App en foreground, mostrando notificación con banner');
-              return {
-                shouldShowAlert: true,
-                shouldPlaySound: true,
-                shouldSetBadge: true,
-                shouldShowBanner: true,
-                shouldShowList: true,
-              };
-            }
-            
-            // Si la app está en background o cerrada, mostrar la notificación completa
-            console.log('📱 App en background, mostrando notificación completa');
-            return {
-              shouldShowAlert: true,
-              shouldPlaySound: true,
-              shouldSetBadge: true,
-              shouldShowBanner: true,
-              shouldShowList: true,
-            };
-          },
-        });
-
-        // Verificar y solicitar permisos
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        
-        if (finalStatus !== 'granted') {
-          console.warn('⚠️ Permisos de notificaciones no concedidos');
-          return;
-        }
-        
-        console.log('✅ Permisos de notificaciones concedidos');
-        
-        // Verificar si las notificaciones están habilitadas en el sistema
-        const settings = await Notifications.getPermissionsAsync();
-        console.log('📱 Estado de permisos de notificaciones:', settings);
-        
-      } catch (error) {
-        console.error('❌ Error configurando notificaciones:', error);
-      }
-    };
-
-    configurarNotificaciones();
-  }, []);
+  // Notificaciones eliminadas
 
   if (!loaded) {
     // Async font loading only occurs in development.
@@ -435,7 +392,33 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <UserProvider userData={userData} onLogout={handleLogout}>
           {/* Si el usuario no tiene datos o no tiene rol asignado, mostrar pantalla de acceso restringido */}
-          {!userData || !userData.role ? (
+          {(() => {
+            console.log('🔍 Debug - userData:', userData);
+            console.log('🔍 Debug - userData?.role:', userData?.role);
+            console.log('🔍 Debug - !userData:', !userData);
+            console.log('🔍 Debug - !userData?.role:', !userData?.role);
+            console.log('🔍 Debug - typeof userData:', typeof userData);
+            console.log('🔍 Debug - userData === null:', userData === null);
+            console.log('🔍 Debug - userData === undefined:', userData === undefined);
+            
+            // Verificar si userData existe y tiene rol
+            const hasUserData = userData !== null && userData !== undefined;
+            const hasRole = userData?.role && userData.role.trim() !== '';
+            
+            console.log('🔍 Debug - hasUserData:', hasUserData);
+            console.log('🔍 Debug - hasRole:', hasRole);
+            
+            const shouldShowRestricted = !hasUserData || !hasRole;
+            console.log('🔍 Debug - shouldShowRestricted:', shouldShowRestricted);
+            
+            if (shouldShowRestricted) {
+              console.log('🚫 Mostrando pantalla de acceso restringido');
+            } else {
+              console.log('✅ Mostrando aplicación principal');
+            }
+            
+            return shouldShowRestricted;
+          })() ? (
             <RestrictedAccess />
           ) : (
             <>

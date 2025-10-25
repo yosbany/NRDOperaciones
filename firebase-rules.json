@@ -9,7 +9,7 @@
       }
     },
     "users": {
-      ".indexOn": ["role", "contactId", "email"]
+      ".indexOn": ["role", "contactId", "email", "uid"]
     },
     "ordenes": {
       ".indexOn": ["fecha", "estado", "proveedorId", "createdAt", "updatedAt"]

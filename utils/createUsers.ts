@@ -1,6 +1,6 @@
 import { get, ref } from 'firebase/database';
 import { USER_ROLES } from '../constants/Config';
-import { auth, database } from '../shared/services/firebaseConfig';
+import { auth, database } from '../services/firebaseService';
 
 /**
  * Función para probar la conexión con Firebase
