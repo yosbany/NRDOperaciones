@@ -27,6 +27,13 @@ try {
   console.log('📝 Creating .nojekyll file...');
   fs.writeFileSync('dist/.nojekyll', '');
 
+  // Copiar fuentes de iconos
+  console.log('📦 Copying icon fonts...');
+  execSync('node scripts/copy-icon-fonts.js', { 
+    stdio: 'inherit',
+    cwd: process.cwd()
+  });
+
   // Crear index.html personalizado si es necesario
   console.log('📄 Creating index.html...');
   const indexPath = path.join('dist', 'index.html');

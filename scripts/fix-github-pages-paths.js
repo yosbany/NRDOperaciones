@@ -42,20 +42,18 @@ function processDirectory(dir) {
 function addFontsCSS() {
   console.log('🎨 Agregando CSS de fuentes de iconos...');
   
-  const fontCSS = `
+  // Leer CSS de fuentes si existe
+  let fontCSS = '';
+  if (fs.existsSync('./assets/fonts.css')) {
+    fontCSS = `<style>${fs.readFileSync('./assets/fonts.css', 'utf8')}</style>`;
+  } else {
+    // Fallback con CDN
+    fontCSS = `
 <style>
-/* Fuentes de iconos para GitHub Pages */
+/* Fuentes de iconos para GitHub Pages - Usando CDN como fallback */
 @font-face {
   font-family: 'Ionicons';
-  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ionicons';
-  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf') format('truetype');
+  src: url('https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.3/Fonts/Ionicons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -63,7 +61,7 @@ function addFontsCSS() {
 
 @font-face {
   font-family: 'FontAwesome';
-  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
+  src: url('https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.3/Fonts/FontAwesome.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -71,7 +69,7 @@ function addFontsCSS() {
 
 @font-face {
   font-family: 'MaterialIcons';
-  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+  src: url('https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.3/Fonts/MaterialIcons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -79,12 +77,26 @@ function addFontsCSS() {
 
 @font-face {
   font-family: 'MaterialCommunityIcons';
-  src: url('./assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+  src: url('https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.3/Fonts/MaterialCommunityIcons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
+
+/* Fallback para iconos usando Unicode */
+.icon-fallback {
+  font-family: 'Arial', sans-serif;
+  font-size: 20px;
+  color: currentColor;
+}
+
+.icon-home::before { content: '🏠'; }
+.icon-list::before { content: '📋'; }
+.icon-cube::before { content: '📦'; }
+.icon-calculator::before { content: '🧮'; }
+.icon-people::before { content: '👥'; }
 </style>`;
+  }
 
   const htmlFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html', 'costos.html'];
   

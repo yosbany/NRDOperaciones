@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist && touch dist/.nojekyll",
-    "deploy:web": "npm run build:web && node scripts/copy-dist-to-root.js && node scripts/fix-github-pages-paths.js"
+    "deploy:web": "node scripts/deploy-github-pages.js",
+    "deploy:web:old": "npm run build:web && node scripts/copy-dist-to-root.js && node scripts/fix-github-pages-paths.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
@@ -59,7 +60,9 @@
     "@types/react": "~19.1.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "copy-webpack-plugin": "^11.0.0",
+    "file-loader": "^6.2.0"
   },
   "private": true
 }
