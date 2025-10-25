@@ -1,15 +1,8 @@
+
 /* Fuentes de iconos para GitHub Pages */
 @font-face {
   font-family: 'Ionicons';
-  src: url('./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Ionicons';
-  src: url('./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf') format('truetype');
+  src: url('./assets/fonts/Ionicons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -17,7 +10,7 @@
 
 @font-face {
   font-family: 'FontAwesome';
-  src: url('./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
+  src: url('./assets/fonts/FontAwesome.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -25,7 +18,7 @@
 
 @font-face {
   font-family: 'MaterialIcons';
-  src: url('./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+  src: url('./assets/fonts/MaterialIcons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -33,8 +26,21 @@
 
 @font-face {
   font-family: 'MaterialCommunityIcons';
-  src: url('./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+  src: url('./assets/fonts/MaterialCommunityIcons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
+
+/* Fallback para iconos usando Unicode */
+.icon-fallback {
+  font-family: 'Arial', sans-serif;
+  font-size: 20px;
+  color: currentColor;
+}
+
+.icon-home::before { content: '🏠'; }
+.icon-list::before { content: '📋'; }
+.icon-cube::before { content: '📦'; }
+.icon-calculator::before { content: '🧮'; }
+.icon-people::before { content: '👥'; }
