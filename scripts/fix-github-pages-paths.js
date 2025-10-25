@@ -19,6 +19,11 @@ function fixPathsInFile(filePath) {
   content = content.replace(/url\("\/assets\//g, 'url("./assets/');
   content = content.replace(/href="\/favicon/g, 'href="./favicon');
   
+  // Corregir rutas específicas de fuentes
+  content = content.replace(/url\("\/assets\/assets\/fonts\//g, 'url("./assets/fonts/');
+  content = content.replace(/href="\/assets\/assets\/fonts\//g, 'href="./assets/fonts/');
+  content = content.replace(/src="\/assets\/assets\/fonts\//g, 'src="./assets/fonts/');
+  
   fs.writeFileSync(filePath, content);
   console.log(`✅ Corregido: ${filePath}`);
 }
