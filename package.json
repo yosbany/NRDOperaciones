@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist && touch dist/.nojekyll",
-    "deploy:web": "npm run build:web && node scripts/copy-dist-to-root.js"
+    "deploy:web": "npm run build:web && node scripts/copy-dist-to-root.js && node scripts/fix-github-pages-paths.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",
