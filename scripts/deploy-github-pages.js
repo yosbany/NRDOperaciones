@@ -12,9 +12,7 @@ try {
   if (fs.existsSync('dist')) {
     fs.rmSync('dist', { recursive: true, force: true });
   }
-  if (fs.existsSync('assets/fonts')) {
-    fs.rmSync('assets/fonts', { recursive: true, force: true });
-  }
+  // No eliminar assets/fonts para preservar SpaceMono-Regular.ttf
 
   // 2. Instalar dependencias si es necesario
   console.log('📦 Verificando dependencias...');
@@ -60,6 +58,17 @@ try {
         console.log(`✅ Copiado: ${file}`);
       }
     });
+  }
+
+  // Copiar también la fuente SpaceMono desde assets/assets/fonts
+  if (fs.existsSync('assets/assets/fonts')) {
+    const spaceMonoSource = path.join('assets/assets/fonts', 'SpaceMono-Regular.49a79d66bdea2debf1832bf4d7aca127.ttf');
+    const spaceMonoDest = path.join('dist', 'assets', 'fonts', 'SpaceMono-Regular.ttf');
+    
+    if (fs.existsSync(spaceMonoSource)) {
+      fs.copyFileSync(spaceMonoSource, spaceMonoDest);
+      console.log('✅ Copiado: SpaceMono-Regular.ttf');
+    }
   }
 
   // 7. Corregir rutas para GitHub Pages

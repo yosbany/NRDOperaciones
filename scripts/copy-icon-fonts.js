@@ -82,11 +82,28 @@ async function copyIconFonts() {
   if (!fs.existsSync(destDir)) {
     fs.mkdirSync(destDir, { recursive: true });
   }
+
+  // Preservar SpaceMono-Regular.ttf si existe
+  const spaceMonoPath = path.join(destDir, 'SpaceMono-Regular.ttf');
+  let spaceMonoExists = false;
+  if (fs.existsSync(spaceMonoPath)) {
+    spaceMonoExists = true;
+    console.log('📁 Preservando SpaceMono-Regular.ttf existente');
+  }
   
   // Intentar copiar desde node_modules
   if (fs.existsSync(sourceDir)) {
     console.log('📁 Copiando fuentes desde node_modules...');
     copyDir(sourceDir, destDir);
+    
+    // Restaurar SpaceMono si existía antes
+    if (spaceMonoExists) {
+      const spaceMonoSource = path.join('./assets/assets/fonts', 'SpaceMono-Regular.49a79d66bdea2debf1832bf4d7aca127.ttf');
+      if (fs.existsSync(spaceMonoSource)) {
+        fs.copyFileSync(spaceMonoSource, spaceMonoPath);
+        console.log('✅ SpaceMono-Regular.ttf restaurado');
+      }
+    }
   } else {
     console.log('⚠️  node_modules no encontrado, descargando desde CDN...');
     

@@ -15,7 +15,7 @@ import { User, auth, clearAuthState, createUserInDatabase, getUserByUid, getUser
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    SpaceMono: require('../assets/assets/fonts/SpaceMono-Regular.49a79d66bdea2debf1832bf4d7aca127.ttf'),
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
