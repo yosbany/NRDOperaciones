@@ -3758,6 +3758,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#D7263D',
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 120,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   actionButtonSecondary: {
     flex: 0,
@@ -3769,6 +3772,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
     textAlign: 'center',
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   actionButtonIcon: {
     marginRight: 10,
@@ -3777,6 +3782,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flexWrap: 'wrap',
+    minHeight: 40,
   },
   modalOverlay: {
     flex: 1,
