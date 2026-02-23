@@ -4,13 +4,15 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 // import { useRouter } from 'expo-router'; // Removed to fix filename error
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
+import FormFooterButtons from '../../components/FormFooterButtons';
 import TabRestrictedAccess from '../../components/TabRestrictedAccess';
 import { useUser } from '../../components/UserContext';
+import { useLoading } from '../../contexts/LoadingContext';
 import { Colors } from '../../constants/Colors';
-import { canAccessTab, deleteProducto, getProductos, getProveedores, logEvento, Producto, Proveedor, saveProducto, updateProducto } from '../../services/firebaseService';
+import { canAccessTab, deleteProducto, getProductos, getProveedores, Producto, Proveedor, saveProducto, updateProducto } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 const UNIDADES = ["CAJA","FUNDA","PACK","PLANCHA","BOLSA","FRASCO","UNIDAD","KILOGRAMO","CAJON","LITRO"];
@@ -36,29 +38,6 @@ const cleanUndefinedFields = (obj: any): any => {
   return cleaned;
 };
 
-function Header({ title, onAdd }: { title: string, onAdd?: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[
-      styles.header,
-      {
-        paddingTop: insets.top + 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-      },
-    ]}>
-      <StatusBar backgroundColor={Colors.tint} barStyle="light-content" />
-      <Text style={styles.headerText}>{title}</Text>
-      {onAdd && (
-        <TouchableOpacity onPress={onAdd} style={{ marginLeft: 12 }}>
-          <Ionicons name="add-circle" size={32} color="#fff" />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F2F6FC' },
@@ -113,31 +92,77 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   formFooterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    minWidth: 100,
+    flex: 0,
+    minWidth: 40,
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
   },
   formFooterBtnPrimary: {
     backgroundColor: '#D7263D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   formFooterBtnSecondary: {
-    backgroundColor: '#f8f8f8',
+    flex: 0,
+    minWidth: 40,
+    backgroundColor: 'transparent',
   },
   formFooterBtnText: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
     color: '#fff',
-    marginLeft: 8,
+    flexShrink: 0,
+    flex: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    numberOfLines: 1,
+    width: 'auto',
+    maxWidth: 'none',
+    lineHeight: 16,
+    alignSelf: 'flex-start',
   },
   formFooterBtnTextSecondary: {
     color: '#D7263D',
     fontWeight: 'bold',
-    fontSize: 16,
-    marginLeft: 8,
+    fontSize: 14,
+    flexShrink: 0,
+    flex: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    numberOfLines: 1,
+    width: 'auto',
+    maxWidth: 'none',
+    lineHeight: 16,
+  },
+  formFooterBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  formFooterBtnIcon: {
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    alignSelf: 'flex-start',
   },
   errorText: { color: '#FF3B30', marginBottom: 8, marginTop: 8, fontWeight: 'bold', fontSize: 15, textAlign: 'center' },
   segmentedContainer: {
@@ -247,22 +272,6 @@ const styles = StyleSheet.create({
   inputFlex: {
     flex: 1,
   },
-  costButton: {
-    backgroundColor: '#D7263D',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    minWidth: 100,
-    justifyContent: 'center',
-  },
-  costButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
 });
 
 // Componente memoizado para items de producto
@@ -275,7 +284,6 @@ const ProductoItem = React.memo(({
   onEdit,
   onDelete,
   onDesactivar,
-  onCostear,
   swipeableRefs
 }: {
   item: Producto;
@@ -286,7 +294,6 @@ const ProductoItem = React.memo(({
   onEdit: (item: Producto) => void;
   onDelete: (id: string) => void;
   onDesactivar: (item: Producto) => void;
-  onCostear: (id: string) => void;
   swipeableRefs: React.MutableRefObject<{ [key: string]: any }>;
 }) => {
   const proveedor = useMemo(() => 
@@ -341,12 +348,6 @@ const ProductoItem = React.memo(({
 
     const actions = [
       {
-        color: '#007AFF',
-        text: 'Costear',
-        icon: 'calculator-outline',
-        onPress: () => onCostear(item.id)
-      },
-      {
         color: '#D7263D',
         text: 'Eliminar',
         icon: 'trash-outline',
@@ -389,7 +390,7 @@ const ProductoItem = React.memo(({
         ))}
       </View>
     );
-  }, [item, onDesactivar, onCostear, onDelete]);
+  }, [item, onDesactivar, onDelete]);
 
   return (
     <Swipeable
@@ -485,8 +486,8 @@ const ProductoItem = React.memo(({
 });
 
 export default function ProductosScreen() {
-  const { userData } = useUser();
-  // const router = useRouter(); // Removed to fix filename error
+  const { userData, onLogout } = useUser();
+  const { showLoading, hideLoading } = useLoading();
 
   // Estados temporales para debugging
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -494,43 +495,41 @@ export default function ProductosScreen() {
   const [productosLoading, setProductosLoading] = useState(true);
   const [proveedoresLoading, setProveedoresLoading] = useState(true);
 
-  // Cargar datos directamente desde Firebase para debugging
+  const loadingRef = useRef({ productos: false, proveedores: false });
   useEffect(() => {
-    console.log('🔍 ProductosScreen useEffect iniciado');
-    console.log('🔍 userData:', userData);
-    console.log('🔍 canAccessTab:', userData ? canAccessTab(userData, 'productos') : 'no userData');
-    
-    if (!userData || !canAccessTab(userData, 'productos')) {
-      console.log('❌ Sin permisos para productos, no cargando datos');
+    if (!userData) {
       return;
     }
-
-    console.log('🔍 Cargando productos directamente...');
+    loadingRef.current = { productos: false, proveedores: false };
+    showLoading();
     try {
       getProductos((productosData) => {
-        console.log('📦 Productos cargados:', productosData?.length || 0);
-        console.log('📦 Primeros 3 productos:', productosData?.slice(0, 3));
         setProductos(productosData || []);
         setProductosLoading(false);
+        loadingRef.current.productos = true;
+        if (loadingRef.current.proveedores) hideLoading();
       });
     } catch (error) {
       console.error('❌ Error cargando productos:', error);
       setProductosLoading(false);
+      loadingRef.current.productos = true;
+      if (loadingRef.current.proveedores) hideLoading();
     }
 
-    console.log('🔍 Cargando proveedores directamente...');
     try {
       getProveedores((proveedoresData) => {
-        console.log('👥 Proveedores cargados:', proveedoresData?.length || 0);
-        console.log('👥 Primeros 3 proveedores:', proveedoresData?.slice(0, 3));
         setProveedores(proveedoresData || []);
         setProveedoresLoading(false);
+        loadingRef.current.proveedores = true;
+        if (loadingRef.current.productos) hideLoading();
       });
     } catch (error) {
       console.error('❌ Error cargando proveedores:', error);
       setProveedoresLoading(false);
+      loadingRef.current.proveedores = true;
+      if (loadingRef.current.productos) hideLoading();
     }
-  }, [userData]);
+  }, [userData, showLoading, hideLoading]);
 
   // Estados del formulario
   const [showForm, setShowForm] = useState(false);
@@ -549,7 +548,6 @@ export default function ProductosScreen() {
   const [precio, setPrecio] = useState('');
   
   // Estados para procesamiento
-  const [procesandoOrden, setProcesandoOrden] = useState(false);
   
   // Estados para modal de desactivación
   const [showDesactivarModal, setShowDesactivarModal] = useState(false);
@@ -561,21 +559,11 @@ export default function ProductosScreen() {
   const flatListRef = useRef<FlatList>(null);
   const swipeableRefs = useRef<{ [key: string]: any }>({});
 
-  // Verificar si el usuario tiene permisos para acceder a productos
-  if (!userData || !canAccessTab(userData, 'productos')) {
-    return <TabRestrictedAccess tabName="productos" />;
-  }
-
   // Funciones utilitarias memoizadas
   const getResponsableOrAlert = useCallback(async () => {
     const responsable = (await AsyncStorage.getItem('responsableApp'))?.trim() || '';
-    if (!responsable) {
-      Alert.alert('Configuración requerida', 'Debe configurar el nombre del responsable en el engranaje de configuración antes de realizar esta acción.');
-      return null;
-    }
-    return responsable;
+    return responsable || 'App';
   }, []);
-
 
   // Filtrado de productos optimizado con useMemo
   const productosFiltrados = useMemo(() => {
@@ -584,13 +572,13 @@ export default function ProductosScreen() {
     let filtered = productos;
     
     if (filtroSegmento === 'nombre' && filtroNombre.trim()) {
-      filtered = filtered.filter(p => containsSearchTerm(p.nombre, filtroNombre));
+      filtered = filtered.filter(p => containsSearchTerm((p as any).nombre ?? (p as any).name ?? '', filtroNombre));
     } else if (filtroSegmento === 'proveedor' && filtroProveedor) {
       filtered = filtered.filter(p => p.proveedorId === filtroProveedor);
-      // Ordenar por campo 'orden' si existe, si no por nombre
+      const nom = (x: Producto) => (x as any).nombre ?? (x as any).name ?? '';
       filtered = [...filtered].sort((a, b) => {
         if (a.orden !== undefined && b.orden !== undefined) return a.orden - b.orden;
-        return a.nombre.localeCompare(b.nombre);
+        return nom(a).localeCompare(nom(b));
       });
     }
     
@@ -624,8 +612,13 @@ export default function ProductosScreen() {
       { text: 'Eliminar', style: 'destructive', onPress: async () => {
         const responsable = await getResponsableOrAlert();
         if (!responsable) return;
-        await deleteProducto(id);
-        await logEvento({ tipoEvento: 'eliminacion_producto', responsable, idAfectado: id, datosJSON: {} });
+        try {
+          showLoading();
+          await deleteProducto(id);
+          getProductos((productosData) => setProductos(productosData || []));
+        } finally {
+          hideLoading();
+        }
       }}
     ]);
   }, [getResponsableOrAlert]);
@@ -648,100 +641,63 @@ export default function ProductosScreen() {
 
   const handleActivarProducto = useCallback(async (item: Producto) => {
     try {
-      if (swipeableRefs.current[item.id]) {
-        swipeableRefs.current[item.id].close();
-      }
-          setProcesandoOrden(true);
-      
-      // Crear objeto limpio sin campos undefined
+      if (swipeableRefs.current[item.id]) swipeableRefs.current[item.id].close();
+      showLoading();
       const updateData = cleanUndefinedFields({ 
         ...item, 
         archivado: false,
         fueraDeTemporada: false,
-        fueraDeTemporadaHasta: undefined // Se eliminará por cleanUndefinedFields
+        fueraDeTemporadaHasta: undefined
       });
-      
       await updateProducto(item.id, updateData);
-      
-      console.log('✅ Producto activado exitosamente');
-      
-          setTimeout(() => {
-            setProcesandoOrden(false);
-          }, 800);
+      setTimeout(() => hideLoading(), 800);
     } catch (error) {
       console.error('Error activando producto:', error);
-      setProcesandoOrden(false);
+      hideLoading();
     }
-  }, [swipeableRefs]);
+  }, [swipeableRefs, showLoading, hideLoading]);
 
   const handleArchivarProducto = useCallback(async () => {
     if (!productoDesactivando) return;
-    
     try {
-      if (swipeableRefs.current[productoDesactivando.id]) {
-        swipeableRefs.current[productoDesactivando.id].close();
-      }
-      setProcesandoOrden(true);
-      
-      const action = productoDesactivando.archivado ? 'Desarchivar' : 'Archivar';
-      
-      // Crear objeto limpio sin campos undefined
+      if (swipeableRefs.current[productoDesactivando.id]) swipeableRefs.current[productoDesactivando.id].close();
+      showLoading();
       const updateData = cleanUndefinedFields({ 
         ...productoDesactivando, 
         archivado: !productoDesactivando.archivado,
         fueraDeTemporada: false,
-        fueraDeTemporadaHasta: undefined // Se eliminará por cleanUndefinedFields
+        fueraDeTemporadaHasta: undefined
       });
-      
       await updateProducto(productoDesactivando.id, updateData);
-      
-      console.log(`✅ Producto ${action.toLowerCase()}do exitosamente`);
       setShowDesactivarModal(false);
       setProductoDesactivando(null);
-      
-      setTimeout(() => {
-        setProcesandoOrden(false);
-      }, 800);
+      setTimeout(() => hideLoading(), 800);
     } catch (error) {
       console.error('Error archivando producto:', error);
-      setProcesandoOrden(false);
+      hideLoading();
     }
-  }, [productoDesactivando, swipeableRefs]);
+  }, [productoDesactivando, swipeableRefs, showLoading, hideLoading]);
 
   const handleFueraDeTemporada = useCallback(async () => {
     if (!productoDesactivando) return;
-    
     try {
-      if (swipeableRefs.current[productoDesactivando.id]) {
-        swipeableRefs.current[productoDesactivando.id].close();
-      }
-      setProcesandoOrden(true);
-      
+      if (swipeableRefs.current[productoDesactivando.id]) swipeableRefs.current[productoDesactivando.id].close();
+      showLoading();
       const updateData = cleanUndefinedFields({ 
         ...productoDesactivando, 
         fueraDeTemporada: true,
         fueraDeTemporadaHasta: fechaFueraTemporada.toISOString(),
-        archivado: false // Asegurar que no esté archivado
+        archivado: false
       });
-      
       await updateProducto(productoDesactivando.id, updateData);
-      
-      console.log('✅ Producto marcado como fuera de temporada hasta:', fechaFueraTemporada.toLocaleDateString());
       setShowDesactivarModal(false);
       setProductoDesactivando(null);
-      
-      setTimeout(() => {
-        setProcesandoOrden(false);
-      }, 800);
+      setTimeout(() => hideLoading(), 800);
     } catch (error) {
       console.error('Error marcando producto fuera de temporada:', error);
-      setProcesandoOrden(false);
+      hideLoading();
     }
-  }, [productoDesactivando, fechaFueraTemporada, swipeableRefs]);
-
-  const handleCostearProduct = useCallback((id: string) => {
-    console.log('📊 Navegando a costos del producto:', id);
-  }, []);
+  }, [productoDesactivando, fechaFueraTemporada, swipeableRefs, showLoading, hideLoading]);
 
   // Función optimizada para renderizar items
   const renderProductItem = useCallback(({ item }: { item: Producto }) => (
@@ -754,7 +710,6 @@ export default function ProductosScreen() {
       onEdit={handleEditProduct}
       onDelete={handleDeleteProduct}
       onDesactivar={handleDesactivarProduct}
-      onCostear={handleCostearProduct}
       swipeableRefs={swipeableRefs}
     />
   ), [
@@ -765,7 +720,6 @@ export default function ProductosScreen() {
     handleEditProduct,
     handleDeleteProduct,
     handleDesactivarProduct,
-    handleCostearProduct,
     swipeableRefs
   ]);
 
@@ -789,20 +743,15 @@ export default function ProductosScreen() {
     }
     setError(false);
     try {
-      const id = await saveProducto({ 
+      showLoading();
+      await saveProducto({ 
         nombre, 
         proveedorId, 
         unidad: unidadFinal, 
         stock: stock ? Number(stock) : undefined, 
         precio: precio !== '' ? Number(precio) : undefined 
       });
-      // Registrar evento
-      await logEvento({ 
-        tipoEvento: 'creacion_producto', 
-        responsable, 
-        idAfectado: id, 
-        datosJSON: { nombre, proveedorId, unidad: unidadFinal, stock, precio: precio !== '' ? Number(precio) : undefined }
-      });
+      getProductos((productosData) => setProductos(productosData || []));
       setNombre('');
       setProveedorId('');
       setUnidad('');
@@ -812,8 +761,10 @@ export default function ProductosScreen() {
       setShowForm(false);
     } catch (e: any) {
       Alert.alert('Error', 'No se pudo guardar el producto: ' + (e?.message || e));
+    } finally {
+      hideLoading();
     }
-  }, [nombre, proveedorId, unidad, unidadPersonalizada, stock, precio, getResponsableOrAlert]);
+  }, [nombre, proveedorId, unidad, unidadPersonalizada, stock, precio, getResponsableOrAlert, showLoading, hideLoading]);
 
   const actualizarProducto = useCallback(async () => {
     if (!productoEditando || !productoEditando.id) return;
@@ -826,23 +777,16 @@ export default function ProductosScreen() {
     }
     setError(false);
     try {
+      showLoading();
       const updateData = cleanUndefinedFields({
-        id: productoEditando.id,
         nombre,
         proveedorId,
         unidad: unidadFinal,
         stock: stock ? Number(stock) : undefined,
         precio: precio !== '' ? Number(precio) : undefined
       });
-      
       await updateProducto(productoEditando.id, updateData);
-      // Registrar evento
-      await logEvento({ 
-        tipoEvento: 'actualizacion_producto', 
-        responsable, 
-        idAfectado: productoEditando.id, 
-        datosJSON: { nombre, proveedorId, unidad: unidadFinal, stock, precio: precio !== '' ? Number(precio) : undefined }
-      });
+      getProductos((productosData) => setProductos(productosData || []));
       setNombre('');
       setProveedorId('');
       setUnidad('');
@@ -853,17 +797,22 @@ export default function ProductosScreen() {
       setShowForm(false);
     } catch (e: any) {
       Alert.alert('Error', 'No se pudo actualizar el producto: ' + (e?.message || e));
+    } finally {
+      hideLoading();
     }
-  }, [productoEditando, nombre, proveedorId, unidad, unidadPersonalizada, stock, precio, getResponsableOrAlert]);
+  }, [productoEditando, nombre, proveedorId, unidad, unidadPersonalizada, stock, precio, getResponsableOrAlert, showLoading, hideLoading]);
+
+  if (userData && !canAccessTab(userData, 'productos')) {
+    return <TabRestrictedAccess message="Solo usuarios del dominio @nrd.adm.com pueden acceder a Productos." />;
+  }
 
   // Mostrar loading si los datos están cargando
   if (productosLoading || proveedoresLoading) {
     return (
       <View style={styles.safeArea}>
-        <Header title="Productos" />
+        <AppHeader title="Productos" showBackButton={false} actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]} />
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color="#D7263D" />
-          <Text style={{ marginTop: 16, color: '#666', fontSize: 16 }}>Cargando productos...</Text>
+          <Text style={{ color: '#666', fontSize: 16 }}>Cargando...</Text>
         </View>
       </View>
     );
@@ -873,7 +822,11 @@ export default function ProductosScreen() {
   if (showForm) {
     return (
       <View style={styles.safeArea}>
-        <Header title={productoEditando ? "Editar producto" : "Nuevo producto"} />
+        <AppHeader 
+          title={productoEditando ? "Editar producto" : "Nuevo producto"}
+          onBack={() => { setShowForm(false); setError(false); }}
+          actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
+        />
         <View style={styles.container}>
           <Text style={styles.label}>Nombre<Text style={{ color: '#FF3B30' }}>*</Text></Text>
           <TextInput
@@ -1058,16 +1011,6 @@ export default function ProductosScreen() {
                 keyboardType="decimal-pad"
                 placeholderTextColor="#aaa"
               />
-              <TouchableOpacity
-                style={styles.costButton}
-                onPress={() => {
-                  setShowForm(false);
-                  console.log('📊 Navegando a costos del producto:', productoEditando.id);
-                }}
-              >
-                <Ionicons name="calculator" size={20} color="#fff" />
-                <Text style={styles.costButtonText}>Ver Costos</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.priceFieldWithCost}>
@@ -1089,65 +1032,37 @@ export default function ProductosScreen() {
                 keyboardType="decimal-pad"
                 placeholderTextColor="#aaa"
               />
-              {productoEditando && (
-                <TouchableOpacity
-                  style={styles.costButton}
-                  onPress={() => {
-                    setShowForm(false);
-                    console.log('📊 Navegando a costos del producto:', productoEditando.id);
-                  }}
-                >
-                  <Ionicons name="calculator" size={20} color="#fff" />
-                  <Text style={styles.costButtonText}>Costear</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
           {error && <Text style={styles.errorText}>Complete todos los campos obligatorios</Text>}
-          <View style={styles.formFooterRow}>
-            <TouchableOpacity
-              style={[styles.formFooterBtn, styles.formFooterBtnSecondary]}
-              onPress={() => {
-                Alert.alert(
-                  'Cancelar',
-                  '¿Estás seguro de que deseas cancelar?',
-                  [
-                    { text: 'No', style: 'cancel' },
-                    { text: 'Sí', onPress: () => { setShowForm(false); setError(false); } }
-                  ]
-                );
-              }}
-            >
-              <Ionicons name="close" size={24} color="#D7263D" />
-              <Text style={styles.formFooterBtnTextSecondary}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.formFooterBtn, styles.formFooterBtnPrimary]}
-              onPress={productoEditando ? actualizarProducto : agregarProducto}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={productoEditando ? 'create-outline' : 'add-circle'} size={22} color="#fff" />
-              <Text style={styles.formFooterBtnText}>{productoEditando ? 'Actualizar' : 'Crear'}</Text>
-            </TouchableOpacity>
-          </View>
         </View>
+        <FormFooterButtons
+          onCancel={() => {
+            Alert.alert(
+              'Cancelar',
+              '¿Estás seguro de que deseas cancelar?',
+              [
+                { text: 'No', style: 'cancel' },
+                { text: 'Sí', onPress: () => { setShowForm(false); setError(false); } }
+              ]
+            );
+          }}
+          onSave={productoEditando ? actualizarProducto : agregarProducto}
+          saveText={productoEditando ? 'Actualizar' : 'Crear'}
+          saveIcon={productoEditando ? 'create-outline' : 'add-circle'}
+          fixed={true}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.safeArea}>
-      <Header title={`Productos (${productosFiltrados.length})`} onAdd={() => {
-        setNombre('');
-        setProveedorId('');
-        setUnidad('');
-        setUnidadPersonalizada('');
-        setStock('');
-        setPrecio('');
-        setError(false);
-        setShowForm(true);
-        setProductoEditando(null);
-      }} />
+      <AppHeader 
+        title={`Productos (${productosFiltrados.length})`} 
+        showBackButton={false}
+        actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
+      />
       <View style={styles.container}>
         <View style={styles.segmentedContainer}>
           {[
@@ -1212,14 +1127,41 @@ export default function ProductosScreen() {
           updateCellsBatchingPeriod={50}
           contentContainerStyle={{ paddingBottom: 100 }}
         />
+        {/* Botón flotante nuevo producto */}
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            right: 20,
+            backgroundColor: '#D7263D',
+            borderRadius: 30,
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+            zIndex: 1000
+          }}
+          onPress={() => {
+            setNombre('');
+            setProveedorId('');
+            setUnidad('');
+            setUnidadPersonalizada('');
+            setStock('');
+            setPrecio('');
+            setError(false);
+            setShowForm(true);
+            setProductoEditando(null);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
         
-        {procesandoOrden && (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
-            <ActivityIndicator size="large" color="#D7263D" />
-            <Text style={{ marginTop: 12, color: '#D7263D', fontWeight: 'bold', fontSize: 16 }}>Procesando...</Text>
-          </View>
-        )}
-
         {/* Modal de Desactivación */}
         <Modal
           visible={showDesactivarModal}

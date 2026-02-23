@@ -3,8 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔧 Corrigiendo rutas para GitHub Pages...');
-
 // Función para corregir rutas en un archivo
 function fixPathsInFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -25,7 +23,6 @@ function fixPathsInFile(filePath) {
   content = content.replace(/src="\/assets\/assets\/fonts\//g, 'src="./assets/fonts/');
   
   fs.writeFileSync(filePath, content);
-  console.log(`✅ Corregido: ${filePath}`);
 }
 
 // Función para procesar directorios recursivamente
@@ -45,8 +42,6 @@ function processDirectory(dir) {
 
 // Función para agregar CSS de fuentes a los archivos HTML
 function addFontsCSS() {
-  console.log('🎨 Agregando CSS de fuentes de iconos...');
-  
   // Leer CSS de fuentes si existe
   let fontCSS = '';
   if (fs.existsSync('./assets/fonts.css')) {
@@ -103,7 +98,7 @@ function addFontsCSS() {
 </style>`;
   }
 
-  const htmlFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html', 'costos.html'];
+  const htmlFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html'];
   
   htmlFiles.forEach(file => {
     if (fs.existsSync(file)) {
@@ -113,14 +108,13 @@ function addFontsCSS() {
       content = content.replace('</head>', fontCSS + '\n</head>');
       
       fs.writeFileSync(file, content);
-      console.log(`✅ CSS de fuentes agregado a ${file}`);
     }
   });
 }
 
 try {
   // Procesar archivos en la raíz
-  const rootFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html', 'costos.html'];
+  const rootFiles = ['index.html', 'ordenes.html', 'productos.html', 'contactos.html'];
   rootFiles.forEach(file => fixPathsInFile(file));
   
   // Agregar CSS de fuentes a los archivos HTML
@@ -131,8 +125,6 @@ try {
   if (fs.existsSync('./assets')) processDirectory('./assets');
   if (fs.existsSync('./web')) processDirectory('./web');
   if (fs.existsSync('./tabs')) processDirectory('./tabs');
-  
-  console.log('✅ Rutas corregidas exitosamente para GitHub Pages');
 } catch (error) {
   console.error('❌ Error corrigiendo rutas:', error);
   process.exit(1);

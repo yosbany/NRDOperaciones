@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { isAdmin } from '../../services/firebaseService';
 // Interfaces simples para los modelos
 interface Producto {
   id: string;
@@ -27,7 +28,7 @@ const ProductosList: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user && user.role === 'ADMIN') {
+    if (user && isAdmin(user)) {
       const loadProductos = async () => {
         try {
           // Por ahora retornar array vacío - se puede implementar después
@@ -113,11 +114,11 @@ const ProductosList: React.FC = () => {
     );
   };
 
-  if (user?.role !== 'ADMIN') {
+  if (!user || !isAdmin(user)) {
     return (
       <View style={styles.accessDeniedContainer}>
         <Text style={styles.accessDeniedTitle}>Acceso Denegado</Text>
-        <Text style={styles.accessDeniedText}>No tienes permisos para acceder a esta sección.</Text>
+        <Text style={styles.accessDeniedText}>Solo administradores (@nrd.adm.com) pueden acceder a esta sección.</Text>
       </View>
     );
   }

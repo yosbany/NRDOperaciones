@@ -81,10 +81,6 @@ export function useOptimizedFirebase<T>(
 
     // Solo crear listener si no existe uno activo para este path
     if (listenerCount === 0) {
-      if (__DEV__) {
-        console.log(`🔥 Creando nuevo listener para: ${path}`);
-      }
-      
       const unsubscribe = onValue(dbRef, 
         (snapshot) => {
           try {
@@ -156,9 +152,6 @@ export function useOptimizedFirebase<T>(
 
         // Si no quedan listeners, limpiar el listener de Firebase
         if (newCount === 0) {
-          if (__DEV__) {
-            console.log(`🧹 Limpiando listener para: ${path}`);
-          }
           const unsubscribe = activeListeners.get(path);
           if (unsubscribe) {
             if (typeof unsubscribe === 'function') {
@@ -174,9 +167,6 @@ export function useOptimizedFirebase<T>(
           setTimeout(() => {
             if (globalCache.get(path)?.listeners.size === 0) {
               globalCache.delete(path);
-              if (__DEV__) {
-                console.log(`🗑️ Cache limpiado para: ${path}`);
-              }
             }
           }, cacheTimeout);
         }
@@ -192,8 +182,6 @@ export function useOptimizedFirebase<T>(
  */
 export function useClearFirebaseCache() {
   return useCallback(() => {
-    console.log('🧹 Limpiando toda la cache de Firebase');
-    
     // Limpiar todos los listeners activos
     activeListeners.forEach((unsubscribe, key) => {
       if (typeof unsubscribe === 'function') {

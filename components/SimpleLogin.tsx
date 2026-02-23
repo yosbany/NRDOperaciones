@@ -36,8 +36,6 @@ export default function SimpleLogin({ onLogin, isLoading = false }: SimpleLoginP
         ? username.trim() 
         : `${username.trim()}@nrd.com`;
       
-      console.log('📧 Email construido:', email);
-      
       await onLogin(email, password);
     } catch (error: any) {
       Alert.alert('Error de autenticación', error.message || 'Error al iniciar sesión');
@@ -51,9 +49,7 @@ export default function SimpleLogin({ onLogin, isLoading = false }: SimpleLoginP
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Logo y título principal */}
           <View style={styles.logoContainer}>
-            <Text style={styles.logo}>NRD Operación</Text>
             <Text style={styles.description}>
               Sistema de gestión de órdenes
             </Text>
@@ -133,11 +129,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: 40,
-  },
-  logo: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: Colors.tint,
   },
   subtitle: {
     fontSize: 18,

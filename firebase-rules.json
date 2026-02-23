@@ -2,29 +2,45 @@
   "rules": {
     ".read": "auth != null",
     ".write": "auth != null",
-    "fcm_tokens": {
-      "$userId": {
-        ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId"
-      }
-    },
     "users": {
-      ".indexOn": ["role", "contactId", "email", "uid"]
+      ".indexOn": [
+        "email",
+        "uid",
+        "contactId",
+        "idContacto"
+      ]
     },
     "ordenes": {
-      ".indexOn": ["fecha", "estado", "proveedorId", "createdAt", "updatedAt"]
+      ".indexOn": [
+        "fecha",
+        "estado",
+        "tipo",
+        "proveedorId",
+        "asignadaA",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "proveedores": {
-      ".indexOn": ["nombre", "tipo", "frecuencia/tipo", "createdAt", "updatedAt"]
+      ".indexOn": [
+        "nombre",
+        "tipo",
+        "createdAt",
+        "updatedAt",
+        "frecuencia/tipo"
+      ]
     },
     "productos": {
-      ".indexOn": ["nombre", "proveedorId", "archivado", "orden", "precio", "stock", "createdAt", "updatedAt"]
-    },
-    "eventos": {
-      ".indexOn": ["tipo", "usuario", "fecha", "createdAt"]
-    },
-    "tareas": {
-      ".indexOn": ["asignadaA", "completada", "prioridad", "publica", "seguidores", "createdAt", "updatedAt"]
+      ".indexOn": [
+        "nombre",
+        "proveedorId",
+        "orden",
+        "precio",
+        "stock",
+        "archivado",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   }
 }

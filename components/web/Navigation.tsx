@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { isAdmin } from '../../services/firebaseService';
+import Logo from '../Logo';
 
 const Navigation: React.FC = () => {
   const router = useRouter();
@@ -23,16 +25,16 @@ const Navigation: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>NRD Operaciones</Text>
+        <Logo width={150} height={50} />
         <View style={styles.userInfo}>
           <Text style={styles.userName}>
             {user?.displayName || user?.username}
           </Text>
           <View style={[styles.roleBadge, { 
-            backgroundColor: user?.role === 'ADMIN' ? '#667eea' : '#28a745' 
+            backgroundColor: isAdmin(user) ? '#667eea' : '#28a745' 
           }]}>
             <Text style={styles.roleText}>
-              {user?.role === 'ADMIN' ? 'Administrador' : 'Productor'}
+              {isAdmin(user) ? 'Administrador' : 'Usuario'}
             </Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
@@ -55,12 +57,6 @@ const Navigation: React.FC = () => {
           <Text style={styles.navText}>Órdenes</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          onPress={() => router.push('/web/tareas')} 
-          style={styles.navItem}
-        >
-          <Text style={styles.navText}>Tareas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
           onPress={() => router.push('/web/productos')} 
           style={styles.navItem}
         >
@@ -71,12 +67,6 @@ const Navigation: React.FC = () => {
           style={styles.navItem}
         >
           <Text style={styles.navText}>Contactos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => router.push('/web/costos')} 
-          style={styles.navItem}
-        >
-          <Text style={styles.navText}>Costos</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -101,11 +91,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
   },
   userInfo: {
     flexDirection: 'row',

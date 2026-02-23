@@ -1,22 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 // import { useFocusEffect, useRoute } from '@react-navigation/native'; // Removed to fix LinkPreviewContext error
 import Constants from 'expo-constants';
-// Notificaciones eliminadas
 // import { useRouter } from 'expo-router'; // Removed to fix filename error
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Keyboard, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
+import FormFooterButtons from '../../components/FormFooterButtons';
 import { useUser } from '../../components/UserContext';
+import { useLoading } from '../../contexts/LoadingContext';
 import { Colors } from '../../constants/Colors';
-import { ESTADOS_ORDEN, ESTADOS_ORDEN_ARRAY } from '../../constants/Ordenes';
 import { ORDENES_TIPOS, ORDENES_TIPOS_ICONS } from '../../constants/OrdenesTipos';
-import { deleteOrden, generarSugerenciasOrden, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, logEvento, Orden, Producto, Proveedor, saveOrden, updateOrden, updateProductosOrdenBatch } from '../../services/firebaseService';
+import { deleteOrden, generarSugerenciasOrden, getEmailPrefix, getOrdenes, getOrdenesByUserRole, getProductos, getProductosDefaultCliente, getProveedores, isAdmin, Orden, Producto, Proveedor, saveOrden, updateOrden, updateProductosOrdenBatch } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
+
+const MAX_ORDENES_VISIBLES = 50;
 
 // Constante para convertir unidades a abreviaturas más cortas
 const UNIDADES_ABREVIADAS: { [key: string]: string } = {
@@ -51,36 +55,6 @@ const isProductoFueraDeTemporada = (producto: Producto): boolean => {
   return hoy <= fechaLimite;
 };
 
-function Header({ title, subtitle, onAdd }: { title: string, subtitle?: React.ReactNode, onAdd?: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[
-      styles.header,
-      {
-        paddingTop: insets.top + 8,
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingHorizontal: 18,
-      },
-    ]}>
-      <StatusBar backgroundColor={Colors.tint} barStyle="light-content" />
-      <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={styles.headerText}>{title}</Text>
-      {onAdd && (
-        <TouchableOpacity onPress={onAdd} style={{ marginLeft: 12 }}>
-          <Ionicons name="add-circle" size={32} color="#fff" />
-        </TouchableOpacity>
-        )}
-      </View>
-      {subtitle && (
-        <View style={{ width: '100%', alignItems: 'flex-start', marginTop: 0 }}>
-          {subtitle}
-        </View>
-      )}
-    </View>
-  );
-}
 
 // Utilidad para formatear mensaje WhatsApp
 function buildWhatsappMessage(
@@ -159,22 +133,7 @@ function buildPrintReport(
 // Utilidad para obtener la URL del servicio de impresión
 const PRINT_SERVICE_URL = Constants?.expoConfig?.extra?.PRINT_SERVICE_URL || process.env.PRINT_SERVICE_URL;
 
-// Agrega la función para obtener el color de fondo según el estado
-function getEstadoColorFondo(estado?: string) {
-  switch ((estado || '').toUpperCase()) {
-    case 'PENDIENTE':
-      return '#FFF8E1'; // amarillo suave
-    case 'ENVIADA':
-    case 'ENVIADA / IMPRESA':
-      return '#E3F0FF'; // azul suave
-    case 'COMPLETADA':
-      return '#E6F9E7'; // verde suave
-    case 'RECHAZADA':
-      return '#FFE6E6'; // rojo suave
-    default:
-      return '#f8f8f8'; // gris por defecto
-  }
-}
+const WIZARD_BAR_COLOR = '#f8f8f8';
 
 function sumaSegura(a: number, b: number): number {
   return a + b;
@@ -182,11 +141,7 @@ function sumaSegura(a: number, b: number): number {
 
 const getResponsableOrAlert = async () => {
   const responsable = (await AsyncStorage.getItem('responsableApp'))?.trim() || '';
-  if (!responsable) {
-    Alert.alert('Configuración requerida', 'Debe configurar el nombre del responsable en el engranaje de configuración antes de realizar esta acción.');
-    return null;
-  }
-  return responsable;
+  return responsable || 'App';
 };
 
 
@@ -233,28 +188,27 @@ const obtenerFechaActual = (): string => {
   return `${dia}-${mes}-${anio} ${hora}:${minuto}:${segundo}`;
 };
 
-async function notificarOrdenPendiente(ordenCreada: Orden, proveedores: Proveedor[]) {
-  try {
-    const proveedor = proveedores.find(p => p.id === ordenCreada.proveedorId);
-    const nombreProveedor = proveedor?.nombre || 'Proveedor desconocido';
-    
-    // Notificaciones eliminadas
-    
-    // Crear un ID único para esta notificación
-    const notificationId = `orden_inmediata_${ordenCreada.id}`;
-    
-    // Notificación eliminada
-  } catch (error) {
-    console.error('❌ Error enviando notificación inmediata:', error);
+// Parsear fecha para ordenar/filtrar (fuera del componente para no recrear)
+function parseFechaOrden(fecha: string): Date {
+  if (/^\d{2}-\d{2}-\d{4}/.test(fecha)) {
+    const [d, m, y, ...resto] = fecha.split(/[-T ]/);
+    const [h, min, s] = resto.length > 0 ? (resto[0] || '00:00:00').split(':') : ['00', '00', '00'];
+    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
   }
+  if (/^\d{4}-\d{2}-\d{2}/.test(fecha)) {
+    const [y, m, d, ...resto] = fecha.split(/[-T ]/);
+    const [h, min, s] = resto.length > 0 ? (resto[0] || '00:00:00').split(':') : ['00', '00', '00'];
+    return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
+  }
+  return new Date(fecha);
 }
-
 
 export default function OrdenesScreen() {
   const insets = useSafeAreaInsets();
   // const router = useRouter(); // Removed to fix filename error
-  const { userData } = useUser();
-  
+  const { userData, onLogout } = useUser();
+  const { showLoading, hideLoading } = useLoading();
+
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorWithPhone[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -275,7 +229,6 @@ export default function OrdenesScreen() {
     ordenesAnalizadas: number;
   }>>([]);
   const [editOrden, setEditOrden] = useState<Orden | null>(null);
-  const [creandoOrdenesProduccion, setCreandoOrdenesProduccion] = useState(false);
   const [editingCantidad, setEditingCantidad] = useState<string | null>(null);
   const [editingUnidad, setEditingUnidad] = useState<string | null>(null);
   const [showUnidadModal, setShowUnidadModal] = useState(false);
@@ -288,12 +241,12 @@ export default function OrdenesScreen() {
   const highlightTimeout = useRef<any>(null);
   const UNIDADES = ["CAJA","FUNDA","PACK","PLANCHA","BOLSA","FRASCO","UNIDAD","KILOGRAMO","CAJON","LITRO"];
 
-  const [showEstadoModal, setShowEstadoModal] = useState(false);
-  const [ordenEstadoEdit, setOrdenEstadoEdit] = useState<Orden | null>(null);
-  const [soloLectura, setSoloLectura] = useState(false);
-  console.log('🔍 COMPONENTE RENDERIZADO - soloLectura:', soloLectura, 'tipo:', typeof soloLectura);
   const [usuario] = useState<string>('Usuario');
   const [showAddProductoModal, setShowAddProductoModal] = useState(false);
+  const [showCrearProductoTempModal, setShowCrearProductoTempModal] = useState(false);
+  const [nombreProductoTemp, setNombreProductoTemp] = useState('');
+  const [precioProductoTemp, setPrecioProductoTemp] = useState('');
+  const [unidadProductoTemp, setUnidadProductoTemp] = useState('UNIDAD');
   const [busquedaProducto, setBusquedaProducto] = useState('');
   const [busquedaOrden, setBusquedaOrden] = useState('');
   const [soloSeleccionados, setSoloSeleccionados] = useState(false);
@@ -304,6 +257,7 @@ export default function OrdenesScreen() {
   // Estado para el modal de prueba
   const [showTestModal, setShowTestModal] = useState(false);
   // Estado para la edición inline de celular
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [editingCelular, setEditingCelular] = useState(false);
   const [tempCelular, setTempCelular] = useState('');
   // const proveedorPreseleccionado = (route.params as any)?.proveedorPreseleccionado; // Removed to fix route error
@@ -316,107 +270,80 @@ export default function OrdenesScreen() {
   const currentSwipeableRef = useRef<Swipeable | null>(null);
   // Estado para mostrar el spinner de cálculo por producto
   const [productoCalculando, setProductoCalculando] = useState<string | null>(null);
-  const [procesandoOrden, setProcesandoOrden] = useState(false);
   const lastTapRef = useRef<{ id: string; timestamp: number } | null>(null);
   // Estado para el orden original y para mostrar el botón de aplicar en el paso 3 del wizard
   const [productosWizardOrdenOriginal, setProductosWizardOrdenOriginal] = useState<Producto[]>([]);
-  const [ordenProgreso, setOrdenProgreso] = useState<{actual: number, total: number, nombre: string} | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false); // Nuevo estado para indicador global
   const [busquedaProveedor, setBusquedaProveedor] = useState('');
-  const [updateAction, setUpdateAction] = useState<'marcando' | 'desmarcando'>('marcando'); // Tipo de acción
   const [fechaOrden, setFechaOrden] = useState<string>('');
   const [editandoFecha, setEditandoFecha] = useState(false);
   const [fechaInputText, setFechaInputText] = useState<string>('');
   const [fechaUpdateTrigger, setFechaUpdateTrigger] = useState(0);
   const [shouldReloadData, setShouldReloadData] = useState(false);
   const [justCreatedOrder, setJustCreatedOrder] = useState(false);
+  const [limiteMostradas, setLimiteMostradas] = useState(MAX_ORDENES_VISIBLES);
+
+  const filtroChangeRef = useRef(false);
+  useEffect(() => {
+    setLimiteMostradas(MAX_ORDENES_VISIBLES);
+  }, [filtro, proveedorFiltro, busquedaOrden]);
 
   useEffect(() => {
-    getProductos((productosData) => {
-      setProductos(productosData);
-    });
-    getProveedores((proveedoresData) => {
-      setProveedores(proveedoresData);
-    });
-    
-    // Usar órdenes filtradas por rol si hay usuario autenticado
+    if (!filtroChangeRef.current) {
+      filtroChangeRef.current = true;
+      return;
+    }
+    const t = setTimeout(() => hideLoading(), 250);
+    return () => clearTimeout(t);
+  }, [filtro, proveedorFiltro, busquedaOrden, hideLoading]);
+
+  const handleCambioFiltro = useCallback((key: 'ultimas' | 'hoy' | 'proveedor' | 'todas') => {
+    showLoading();
+    requestAnimationFrame(() => setFiltro(key));
+  }, [showLoading]);
+
+  const handleCambioProveedor = useCallback((value: string) => {
+    showLoading();
+    requestAnimationFrame(() => setProveedorFiltro(value));
+  }, [showLoading]);
+
+  useEffect(() => {
+    showLoading();
+    getProductos((productosData) => setProductos(productosData || []));
+    getProveedores((proveedoresData) => setProveedores(proveedoresData || []));
     if (userData) {
-      console.log('🔍 Cargando órdenes filtradas por rol:', {
-        role: userData.role,
-        contactId: userData.contactId
-      });
       getOrdenesByUserRole(userData, (ordenesData) => {
-        console.log('✅ Órdenes cargadas para usuario:', {
-          role: userData.role,
-          totalOrdenes: ordenesData.length,
-          ordenes: ordenesData.map(o => ({ id: o.id, proveedorId: o.proveedorId }))
-        });
         setOrdenes(ordenesData);
         setLoading(false);
+        hideLoading();
       });
     } else {
       getOrdenes((ordenesData) => {
         setOrdenes(ordenesData);
         setLoading(false);
+        hideLoading();
       });
     }
-  }, [userData]);
+  }, [userData, showLoading, hideLoading]);
 
   // Recargar órdenes cuando el componente se monta
   useEffect(() => {
-    console.log('🔄 Tab de órdenes montado - Verificando si recargar datos');
-    console.log('🔍 Estado actual:', {
-      ordenesLength: ordenes.length,
-      filtroActual: filtro,
-        proveedorFiltro,
-        wizardVisible,
-        shouldReloadData,
-        justCreatedOrder
-      });
-      
       // NO recargar si acabamos de crear/actualizar una orden o si el wizard está activo
-      // Esto evita que se pierda el filtro después de crear/actualizar una orden
-      if (wizardVisible || justCreatedOrder) {
-        console.log('📋 No recargando datos:', {
-          wizardVisible,
-          justCreatedOrder,
-          filtroActual: filtro,
-          proveedorFiltro,
-          razon: wizardVisible ? 'Wizard activo' : 'Orden recién creada/actualizada'
-        });
-        return;
-      }
-      
+      if (wizardVisible || justCreatedOrder) return;
       // Solo recargar si no hay órdenes cargadas o si se solicita explícitamente
       if (ordenes.length === 0 || shouldReloadData) {
-        console.log('📋 Recargando datos:', {
-          ordenesLength: ordenes.length,
-          shouldReloadData
-        });
         if (userData) {
           getOrdenesByUserRole(userData, (ordenesData) => {
-            console.log('✅ Órdenes recargadas al enfocar tab:', {
-              role: userData.role,
-              totalOrdenes: ordenesData.length
-            });
             setOrdenes(ordenesData);
-            setShouldReloadData(false); // Resetear el flag después de recargar
+            setShouldReloadData(false);
           });
         } else {
           getOrdenes((ordenesData) => {
             setOrdenes(ordenesData);
-            setShouldReloadData(false); // Resetear el flag después de recargar
+            setShouldReloadData(false);
           });
         }
-      } else {
-        console.log('📋 Manteniendo órdenes existentes y filtros:', {
-          totalOrdenes: ordenes.length,
-          filtroActual: filtro,
-          proveedorFiltro,
-          shouldReloadData
-        });
       }
-    }, [userData, ordenes.length, wizardVisible, shouldReloadData]);
+    }, [userData, ordenes.length, wizardVisible, shouldReloadData, justCreatedOrder]);
 
   useEffect(() => {
     if (proveedorPreseleccionado && proveedores.length > 0) {
@@ -433,128 +360,37 @@ export default function OrdenesScreen() {
 
   // Manejar navegación a orden específica
   useEffect(() => {
-    console.log('🔍 useEffect ordenIdPreseleccionada:', {
-      ordenIdPreseleccionada,
-      ordenesLength: ordenes.length,
-      routeParams: 'No navigation params available'
-    });
-    
     if (ordenIdPreseleccionada && ordenes.length > 0) {
       const ordenEncontrada = ordenes.find(o => o.id === ordenIdPreseleccionada);
-      console.log('🔍 Buscando orden con ID:', ordenIdPreseleccionada);
-      console.log('🔍 Orden encontrada:', ordenEncontrada ? ordenEncontrada.id : 'NO ENCONTRADA');
-      
-      if (ordenEncontrada) {
-        console.log('🚀 Abriendo orden específica:', ordenEncontrada.id);
-        openWizard(ordenEncontrada);
-      } else {
-        console.warn('⚠️ No se encontró la orden con ID:', ordenIdPreseleccionada);
-        console.log('📋 Órdenes disponibles:', ordenes.map(o => o.id).slice(0, 5));
-      }
+      if (ordenEncontrada) openWizard(ordenEncontrada);
     }
   }, [ordenes, ordenIdPreseleccionada]);
 
-  useEffect(() => {
-    console.log('🔍 useEffect - soloLectura cambió a:', soloLectura);
-    if (soloLectura) {
-      setSoloSeleccionados(true);
-    } else {
-      // Solo establecer como false si no estamos en modo edición
-      if (!editOrden) {
-        setSoloSeleccionados(false);
-      }
-    }
-  }, [soloLectura, editOrden]);
 
-  // Si el usuario es PRODUCTOR y tiene el filtro de proveedor activo, cambiarlo a ultimas
+  // Si el usuario no es admin y tiene el filtro de proveedor activo, cambiarlo a ultimas
   useEffect(() => {
-    if (userData?.role === 'PRODUCTOR' && filtro === 'proveedor') {
+    if (!isAdmin(userData) && filtro === 'proveedor') {
       setFiltro('ultimas');
       setProveedorFiltro('');
     }
-  }, [userData?.role, filtro]);
+  }, [userData, filtro]);
 
-  // Wizard handlers
-  const openWizard = (ordenToEdit?: Orden) => {
+  // Wizard handlers (useCallback para no invalidar renderOrden en cada render)
+  const openWizard = useCallback((ordenToEdit?: Orden) => {
     if (ordenToEdit) {
       setEditOrden(ordenToEdit);
       setProveedorSel(proveedores.find(p => p.id === ordenToEdit.proveedorId) || null);
       setTipoSel(ordenToEdit.tipo);
-      // Debug: Verificar estructura de productos en la orden
-      console.log('🔍 DEBUG - Abriendo orden:', {
-        ordenId: ordenToEdit.id,
-        proveedor: ordenToEdit.proveedorNombre,
-        tipo: ordenToEdit.tipo,
-        totalProductos: ordenToEdit.productos?.length || 0
-      });
-      
-      console.log('🔍 Estructura de productos en orden existente:', ordenToEdit.productos?.map(p => ({
-        tieneId: !!p.id,
-        tieneProductoId: !!p.productoId,
-        id: p.id,
-        productoId: p.productoId,
-        cantidad: p.cantidad,
-        unidad: p.unidad,
-        tipoEstructura: p.id ? 'nueva' : 'antigua'
-      })));
-      
       const productosCompatibles = (ordenToEdit.productos || [])
         .map(p => {
-          // Manejar estructura antigua y nueva
           const productoId = p.id || p.productoId;
           const cantidad = typeof p.cantidad === 'string' ? p.cantidad : p.cantidad?.toString() || '0';
-          
-          return { 
-            id: productoId,
-            cantidad: cantidad, 
-            unidad: p.unidad || 'UNIDAD'
-          };
+          return { id: productoId, cantidad, unidad: p.unidad || 'UNIDAD' };
         })
-        .filter(p => p.id); // Filtrar productos sin ID válido
-      
-      console.log('🔍 Productos convertidos para selección:', productosCompatibles.map(p => ({
-        id: p.id,
-        cantidad: p.cantidad,
-        unidad: p.unidad,
-        idValido: !!p.id
-      })));
-      
+        .filter(p => p.id);
       setProductosSel(productosCompatibles);
       setFechaOrden(ordenToEdit.fecha || obtenerFechaActual());
       setWizardStep(3);
-      // Determinar si la orden debe estar en solo lectura
-      // Las órdenes de productores pueden ser editadas incluso cuando están enviadas/impresas
-      const proveedor = proveedores.find(p => p.id === ordenToEdit.proveedorId);
-      const esProductor = proveedor?.tipo === 'Productor';
-      
-      // Forzar que solo COMPLETADA, RECHAZADA y AUTOMATICA estén en solo lectura
-      let esSoloLectura = false;
-      const estadoNormalizado = ordenToEdit.estado?.trim().toUpperCase();
-      const tipoNormalizado = ordenToEdit.tipo?.trim().toUpperCase();
-      
-      if (estadoNormalizado === 'COMPLETADA' || estadoNormalizado === 'RECHAZADA') {
-        esSoloLectura = true;
-      }
-      
-      // Las órdenes automáticas pueden ser editadas por el productor
-      // Esto permite que los productores ajusten cantidades, agreguen/quiten productos
-      // y modifiquen otros aspectos de la orden automática según sus necesidades
-      
-      console.log('🔍 Estado de la orden:', {
-        estadoOriginal: ordenToEdit.estado,
-        estadoNormalizado,
-        tipoOriginal: ordenToEdit.tipo,
-        tipoNormalizado,
-        esSoloLectura,
-        esCompletada: estadoNormalizado === 'COMPLETADA',
-        esRechazada: estadoNormalizado === 'RECHAZADA',
-        esAutomatica: tipoNormalizado === 'AUTOMATICA',
-        deberiaSerSoloLectura: estadoNormalizado === 'COMPLETADA' || estadoNormalizado === 'RECHAZADA'
-      });
-      
-      console.log('🔍 SETEANDO soloLectura:', { esSoloLectura, estadoOrden: ordenToEdit.estado });
-      setSoloLectura(esSoloLectura);
-      // Solo seleccionados debe estar desmarcado para órdenes nuevas y pendientes
       setSoloSeleccionados(false);
       setOrdenDuplicarSel(null);
     } else {
@@ -563,37 +399,29 @@ export default function OrdenesScreen() {
       setProductosSel([]);
       setProductosDefaultDisponibles([]);
       setProductosSugeridos([]);
-      const fechaActual = obtenerFechaActual();
-      setFechaOrden(fechaActual);
-      console.log('🔍 NUEVA ORDEN - Fecha establecida:', fechaActual);
-      
-      // Si el usuario es PRODUCTOR, preseleccionar su proveedor y ir al paso 2
-      if (userData?.role === 'PRODUCTOR' && userData.contactId) {
-        const proveedorAsociado = proveedores.find(p => p.id === userData.contactId);
-        if (proveedorAsociado) {
-          setProveedorSel(proveedorAsociado);
-          setWizardStep(2);
-          console.log('🔍 PRODUCTOR - Preseleccionando proveedor:', proveedorAsociado.nombre);
-        } else {
-          setProveedorSel(null);
-          setWizardStep(1);
-          console.log('⚠️ PRODUCTOR - No se encontró el proveedor asociado');
-        }
+      setFechaOrden(obtenerFechaActual());
+      setBusquedaOrden('');
+      setSoloSeleccionados(false);
+      if (!isAdmin(userData) && userData) {
+        const prefix = getEmailPrefix(userData);
+        const proveedorAsociado = proveedores.find(p => (p.nombre ?? '').toLowerCase().trim() === prefix);
+        setProveedorSel(proveedorAsociado || null);
+        setWizardStep(proveedorAsociado ? 2 : 1);
       } else {
         setProveedorSel(null);
         setWizardStep(1);
       }
-      
-      console.log('🔍 NUEVA ORDEN - setSoloLectura(false)');
-      setSoloLectura(false);
-      // Solo seleccionados debe estar desmarcado para órdenes nuevas
-      setSoloSeleccionados(false);
       setOrdenDuplicarSel(null);
     }
     setWizardVisible(true);
-  };
+  }, [proveedores, userData, userData?.contactId]);
   const closeWizard = () => {
     setWizardVisible(false);
+    setWizardStep(1);
+    setProveedorSel(null);
+    setTipoSel(null);
+    setProductosSel([]);
+    setEditOrden(null);
     setBusquedaOrden('');
     setBusquedaProveedor('');
     setSoloSeleccionados(false);
@@ -604,113 +432,127 @@ export default function OrdenesScreen() {
     setFechaInputText('');
   };
 
-  let ordenesFiltradas = ordenes;
-  // Obtener la fecha de hoy en formato dd-mm-yyyy
-  const hoyDate = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  const hoyStr = `${pad(hoyDate.getDate())}-${pad(hoyDate.getMonth() + 1)}-${hoyDate.getFullYear()}`;
+  // Memoizar ordenación y filtrado de órdenes para evitar recalcular en cada render
+  const hoyStr = useMemo(() => {
+    const hoyDate = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(hoyDate.getDate())}-${pad(hoyDate.getMonth() + 1)}-${hoyDate.getFullYear()}`;
+  }, []);
 
-  // Ordenar siempre por fecha descendente antes de filtrar
-  const parseFecha = (fecha: string) => {
-    // Soporta dd-mm-yyyy y yyyy-mm-dd, incluyendo hora, minuto y segundo
-    if (/^\d{2}-\d{2}-\d{4}/.test(fecha)) {
-      const [d, m, y, ...resto] = fecha.split(/[-T ]/);
-      const [h, min, s] = resto.length > 0 ? resto[0].split(':') : ['00', '00', '00'];
-      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
-    } else if (/^\d{4}-\d{2}-\d{2}/.test(fecha)) {
-      const [y, m, d, ...resto] = fecha.split(/[-T ]/);
-      const [h, min, s] = resto.length > 0 ? resto[0].split(':') : ['00', '00', '00'];
-      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
-    }
-    return new Date(fecha);
-  };
-  const ordenesOrdenadas = [...ordenes].sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime());
-
+  const ordenesFiltradas = useMemo(() => {
+    const ordenesOrdenadas = [...ordenes].sort((a, b) =>
+      parseFechaOrden(b.fecha).getTime() - parseFechaOrden(a.fecha).getTime()
+    );
     if (filtro === 'ultimas') {
-    ordenesFiltradas = ordenesOrdenadas.slice(0, 10);
-    } else if (filtro === 'hoy') {
-    ordenesFiltradas = ordenesOrdenadas.filter(o => {
-      // Extraer solo la parte de la fecha (sin hora)
-      let fechaSoloDia = o.fecha;
-      if (fechaSoloDia.includes(' ')) fechaSoloDia = fechaSoloDia.split(' ')[0];
-      // Normalizar a dd-mm-yyyy
-      if (/^\d{4}-\d{2}-\d{2}/.test(fechaSoloDia)) {
-        const [y, m, d] = fechaSoloDia.split('-');
-        fechaSoloDia = `${d}-${m}-${y}`;
-      }
-      return fechaSoloDia === hoyStr;
-    });
-    } else if (filtro === 'proveedor' && proveedorFiltro) {
-    // Si hay un término de búsqueda, buscar en el nombre del proveedor
-    if (busquedaOrden) {
-      const proveedor = proveedores.find(p => p.id === proveedorFiltro);
-      if (proveedor && containsSearchTerm(proveedor.nombre, busquedaOrden)) {
-    ordenesFiltradas = ordenesOrdenadas.filter(o => o.proveedorId === proveedorFiltro);
-      } else {
-        ordenesFiltradas = [];
-      }
-    } else {
-      ordenesFiltradas = ordenesOrdenadas.filter(o => o.proveedorId === proveedorFiltro);
+      return ordenesOrdenadas.slice(0, 10);
     }
-  } else {
-    // Si hay un término de búsqueda, buscar en nombres de proveedores
+    if (filtro === 'hoy') {
+      return ordenesOrdenadas.filter(o => {
+        let fechaSoloDia = o.fecha;
+        if (fechaSoloDia.includes(' ')) fechaSoloDia = fechaSoloDia.split(' ')[0];
+        if (/^\d{4}-\d{2}-\d{2}/.test(fechaSoloDia)) {
+          const [y, m, d] = fechaSoloDia.split('-');
+          fechaSoloDia = `${d}-${m}-${y}`;
+        }
+        return fechaSoloDia === hoyStr;
+      });
+    }
+    if (filtro === 'proveedor' && proveedorFiltro) {
+      if (busquedaOrden) {
+        const proveedor = proveedores.find(p => p.id === proveedorFiltro);
+        if (proveedor && containsSearchTerm(proveedor.nombre, busquedaOrden)) {
+          return ordenesOrdenadas.filter(o => o.proveedorId === proveedorFiltro);
+        }
+        return [];
+      }
+      return ordenesOrdenadas.filter(o => o.proveedorId === proveedorFiltro);
+    }
     if (busquedaOrden) {
-      ordenesFiltradas = ordenesOrdenadas.filter(o => {
+      return ordenesOrdenadas.filter(o => {
         const proveedor = proveedores.find(p => p.id === o.proveedorId);
         return proveedor && containsSearchTerm(proveedor.nombre, busquedaOrden);
       });
-  } else {
-    ordenesFiltradas = ordenesOrdenadas;
     }
-  }
+    return ordenesOrdenadas;
+  }, [ordenes, filtro, proveedorFiltro, busquedaOrden, proveedores, hoyStr]);
 
-  const puedeEliminarOrden = (orden: Orden) => orden.estado === 'PENDIENTE';
+  // Map proveedor id -> proveedor para O(1) lookup en listas
+  const proveedorById = useMemo(() => {
+    const m = new Map<string, ProveedorWithPhone>();
+    proveedores.forEach(p => m.set(p.id, p));
+    return m;
+  }, [proveedores]);
 
-  const renderOrden = ({ item }: { item: Orden }) => {
-    const proveedor = proveedores.find(p => p.id === item.proveedorId);
-    let fechaMostrar = item.fecha;
-    if (item.fecha && item.fecha.length >= 10) {
-      if (/^\d{2}-\d{2}-\d{4}/.test(item.fecha)) {
-        fechaMostrar = item.fecha;
-      } else if (/^\d{4}-\d{2}-\d{2}/.test(item.fecha)) {
-        const [fechaPart, horaPart] = item.fecha.split(' ');
-        const [y, m, d] = fechaPart.split('-');
-        fechaMostrar = `${d}-${m}-${y}`;
-        if (horaPart) fechaMostrar += ` ${horaPart}`;
+  const ordenesParaLista = useMemo(
+    () => ordenesFiltradas.slice(0, limiteMostradas),
+    [ordenesFiltradas, limiteMostradas]
+  );
+
+  // Metadata solo para las órdenes visibles (máx 50) para no bloquear la UI al cambiar filtro
+  const ordenMetadataMap = useMemo(() => {
+    const hoy = new Date();
+    const tresMesesAtras = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
+    const map = new Map<string, { importeTotal: number; fueraDeTendencia: boolean; fechaMostrar: string }>();
+    ordenesParaLista.forEach(item => {
+      let fechaMostrar = item.fecha;
+      if (item.fecha && item.fecha.length >= 10) {
+        if (/^\d{2}-\d{2}-\d{4}/.test(item.fecha)) {
+          fechaMostrar = item.fecha;
+        } else if (/^\d{4}-\d{2}-\d{2}/.test(item.fecha)) {
+          const [fechaPart, horaPart] = item.fecha.split(' ');
+          const [y, m, d] = fechaPart.split('-');
+          fechaMostrar = `${d}-${m}-${y}`;
+          if (horaPart) fechaMostrar += ` ${horaPart}`;
+        }
       }
-    }
-    // Solo mostrar advertencia si hay productos y al menos uno está fuera de tendencia
-    const fueraDeTendencia = item.productos && item.productos.length > 0 && item.productos.some(prod => {
-      const hoy = new Date();
-      const tresMesesAtras = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
-      const ordenesUltimos3Meses = ordenes.filter(o => {
-        const fechaO = parseFecha(o.fecha);
-        return fechaO >= tresMesesAtras && fechaO <= hoy && Array.isArray(o.productos) && (o.productos as ProductoOrden[]).some((p: ProductoOrden) => p.productoId === prod.productoId);
-      });
-      ordenesUltimos3Meses.sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime());
-      const comprasProducto = ordenesUltimos3Meses
-        .map(o => Array.isArray(o.productos) ? (o.productos as ProductoOrden[]).find((p: ProductoOrden) => p.productoId === prod.productoId) : null)
-        .filter((p): p is ProductoOrden => !!p && typeof p.cantidad === 'string' && !isNaN(Number(p.cantidad)))
-        .map(p => Number(p.cantidad))
-        .filter((n): n is number => typeof n === 'number' && !isNaN(n));
-      
-      const cantidadActual = Number(prod.cantidad);
-      const cantidadPromedio = comprasProducto.length > 0 ? Math.round(comprasProducto.reduce((a, b) => a + b, 0) / comprasProducto.length) : null;
-      
-      return cantidadActual !== null && cantidadPromedio !== null && 
-        Math.abs(cantidadActual - cantidadPromedio) / cantidadPromedio > 0.2;
+      const importeTotal = item.productos && item.productos.length > 0
+        ? item.productos.reduce((acc, prod) => {
+            let precio = 0;
+            if (prod.precio !== undefined && prod.precio !== null) {
+              precio = Number(prod.precio);
+            } else if (prod.subtotal !== undefined && prod.subtotal !== null && Number(prod.cantidad) > 0) {
+              precio = Number(prod.subtotal) / Number(prod.cantidad);
+            } else {
+              const productoId = prod.id || prod.productoId;
+              const productoInfo = productos.find(p => p.id === productoId);
+              precio = productoInfo?.precio ?? 0;
+            }
+            return acc + ((Number(prod.cantidad) || 0) * precio);
+          }, 0)
+        : (item.total || 0);
+      const fueraDeTendencia = !!(item.productos && item.productos.length > 0 && item.productos.some((prod: any) => {
+        const ordenesUltimos3Meses = ordenes.filter(o => {
+          const fechaO = parseFechaOrden(o.fecha);
+          return fechaO >= tresMesesAtras && fechaO <= hoy && Array.isArray(o.productos) && (o.productos as ProductoOrden[]).some((p: ProductoOrden) => p.productoId === (prod.productoId || prod.id));
+        });
+        ordenesUltimos3Meses.sort((a, b) => parseFechaOrden(b.fecha).getTime() - parseFechaOrden(a.fecha).getTime());
+        const comprasProducto = ordenesUltimos3Meses
+          .map(o => Array.isArray(o.productos) ? (o.productos as ProductoOrden[]).find((p: ProductoOrden) => p.productoId === (prod.productoId || prod.id)) : null)
+          .filter((p): p is ProductoOrden => !!p && typeof p.cantidad === 'string' && !isNaN(Number(p.cantidad)))
+          .map(p => Number(p.cantidad))
+          .filter((n): n is number => typeof n === 'number' && !isNaN(n));
+        const cantidadActual = Number(prod.cantidad);
+        const cantidadPromedio = comprasProducto.length > 0 ? Math.round(comprasProducto.reduce((a, b) => a + b, 0) / comprasProducto.length) : null;
+        return cantidadActual !== null && cantidadPromedio !== null && cantidadPromedio > 0 &&
+          Math.abs(cantidadActual - cantidadPromedio) / cantidadPromedio > 0.2;
+      }));
+      map.set(item.id, { importeTotal, fueraDeTendencia, fechaMostrar });
     });
-    // 1. En la tarjeta de la orden (renderOrden):
-    // Calcular el importe total de la orden
-    const importeTotal = item.productos && item.productos.length > 0
-      ? item.productos.reduce((acc, prod) => {
-          const productoInfo = productos.find(p => p.id === prod.productoId);
-          if (productoInfo && productoInfo.precio !== undefined && !isNaN(Number(prod.cantidad))) {
-            return acc + (Number(prod.cantidad) * Number(productoInfo.precio));
-          }
-          return acc;
-        }, 0)
-      : 0;
+    return map;
+  }, [ordenesParaLista, ordenes, productos]);
+
+  const puedeEliminarOrden = () => true;
+  const keyExtractorOrdenes = useCallback((item: Orden) => item.id, []);
+
+  const hayMasOrdenes = ordenesFiltradas.length > MAX_ORDENES_VISIBLES && limiteMostradas < ordenesFiltradas.length;
+  const cantidadMas = ordenesFiltradas.length - limiteMostradas;
+
+  const renderOrden = useCallback(({ item }: { item: Orden }) => {
+    const meta = ordenMetadataMap.get(item.id);
+    const proveedor = proveedorById.get(item.proveedorId);
+    const importeTotal = meta?.importeTotal ?? 0;
+    const fueraDeTendencia = meta?.fueraDeTendencia ?? false;
+    const fechaMostrar = meta?.fechaMostrar ?? item.fecha ?? '';
     return (
       <Swipeable
         ref={ref => { if (ref) swipeableRefs.current[item.id] = ref; }}
@@ -724,12 +566,15 @@ export default function OrdenesScreen() {
                 style={{ backgroundColor: '#D7263D', borderTopRightRadius: 4, borderBottomRightRadius: 4, paddingHorizontal: 18, justifyContent: 'center', alignItems: 'center', alignSelf: 'stretch' }}
                 onPress={async () => {
                   if (swipeableRefs.current[item.id]) swipeableRefs.current[item.id].close();
-                  // Eliminar orden directamente
                   const responsable = await getResponsableOrAlert();
                   if (!responsable) return;
-                  await deleteOrden(item.id);
-                  await logEvento({ tipoEvento: 'eliminacion_orden', responsable, idAfectado: item.id, datosJSON: item });
-                  setOrdenes(prev => prev.filter(o => o.id !== item.id));
+                  try {
+                    showLoading();
+                    await deleteOrden(item.id);
+                    setOrdenes(prev => prev.filter(o => o.id !== item.id));
+                  } finally {
+                    hideLoading();
+                  }
                 }}
               >
                 <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Eliminar</Text>
@@ -753,71 +598,66 @@ export default function OrdenesScreen() {
             // fueraDeTendencia && { borderColor: '#FFD600', borderWidth: 3 } // <-- Elimino esta línea
           ]}
           onPress={() => openWizard(item)}
-          onLongPress={() => {
-            setOrdenEstadoEdit(item);
-            setShowEstadoModal(true);
-                }}
-          delayLongPress={400}
           activeOpacity={0.85}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.proveedor}>{(proveedores.find(p => p.id === item.proveedorId)?.nombre) || 'Proveedor desconocido'}</Text>
+            <Text style={styles.proveedor}>{proveedor?.nombre || 'Proveedor desconocido'}</Text>
             <View style={{ position: 'absolute', top: 0, right: 0, flexDirection: 'row', alignItems: 'center' }}>
               {fueraDeTendencia && (
                 <Ionicons name="warning" size={20} color="#FFD600" style={{ marginRight: 4 }} />
               )}
-              {/* Indicador para órdenes de productores editables */}
-              {(() => {
-                const proveedor = proveedores.find(p => p.id === item.proveedorId);
-                const esProductor = proveedor?.tipo === 'Productor';
-                const puedeEditar = esProductor && (item.estado === 'ENVIADA' || item.estado === 'ENVIADA / IMPRESA');
-                return puedeEditar ? (
-                  <View style={{ 
-                    backgroundColor: '#4CAF50', 
-                    borderRadius: 10, 
-                    paddingHorizontal: 6, 
-                    paddingVertical: 2,
-                    marginLeft: 4
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>EDITABLE</Text>
-                  </View>
-                ) : null;
-              })()}
             </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <Ionicons name="calendar-outline" size={16} color="#888" style={{ marginRight: 6 }} />
-            <Text style={styles.cardPropText}>{fechaMostrar}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
+            <Ionicons name="calendar-outline" size={14} color="#888" style={{ marginRight: 4 }} />
+            <Text style={[styles.cardPropText, { fontWeight: 'bold', color: '#333' }]}>{fechaMostrar}</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <Ionicons name="cube-outline" size={16} color="#888" style={{ marginRight: 6 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
+            <Ionicons name="cube-outline" size={14} color="#888" style={{ marginRight: 4 }} />
             <Text style={styles.cardPropText}>Ítems: {item.productos ? item.productos.length : 0}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-            <Ionicons name="pricetag-outline" size={16} color="#888" style={{ marginRight: 6 }} />
-            <Text style={styles.cardPropText}>{ORDENES_TIPOS[item.tipo as keyof typeof ORDENES_TIPOS]}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {getEstadoIcon(item.estado)}
-            <View style={[styles.estadoBadge, getEstadoStyle(item.estado), { marginLeft: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, minWidth: 0 }]}> 
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12, textAlign: 'center', textTransform: 'capitalize', letterSpacing: 0.2 }}>{item.estado}</Text>
+              <Ionicons name="pricetag-outline" size={16} color="#888" style={{ marginRight: 6 }} />
+              <Text style={styles.cardPropText}>{ORDENES_TIPOS[item.tipo as keyof typeof ORDENES_TIPOS]}</Text>
             </View>
-            </View>
-            {importeTotal > 0 && (
-              <Text style={{ color: '#D7263D', fontWeight: 'bold', fontSize: 15, textAlign: 'right' }}>${importeTotal.toFixed(2)}</Text>
+            {isAdmin(userData) && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="cash-outline" size={16} color="#D7263D" />
+                <Text style={{ color: '#D7263D', fontWeight: 'bold', fontSize: 15 }}>${importeTotal.toFixed(2)}</Text>
+              </View>
             )}
           </View>
               </TouchableOpacity>
       </Swipeable>
     );
-  };
+  }, [ordenMetadataMap, proveedorById, highlightedOrdenId, userData, openWizard]);
+
+  // Uso de proveedores por orden (para ordenar en paso 1 del wizard)
+  const proveedorUso = useMemo(() => {
+    const u: Record<string, number> = {};
+    ordenes.forEach(o => {
+      if (o.proveedorId) u[o.proveedorId] = (u[o.proveedorId] || 0) + 1;
+    });
+    return u;
+  }, [ordenes]);
+
+  // No-admin: solo mostrar botón nueva orden si tiene al menos un proveedor con nombre = parte antes del @
+  const mostrarBotonNuevaOrden = useMemo(() => {
+    if (!proveedores.length) return false;
+    if (isAdmin(userData)) return true;
+    if (!userData) return false;
+    const prefix = getEmailPrefix(userData);
+    return proveedores.some(p => (p.nombre ?? '').toLowerCase().trim() === prefix);
+  }, [proveedores, userData]);
 
   // Wizard UI
   const renderWizard = () => {
+    // Si estamos en paso 3 pero no hay proveedor (estado inconsistente), mostrar paso 1 para no dejar pantalla en blanco
+    const effectiveStep: 1 | 2 | 3 = (wizardStep === 3 && !proveedorSel) ? 1 : wizardStep;
     const pasos = ['Proveedor', 'Tipo', 'Productos'];
     const productosProveedorCount = proveedorSel ? productos.filter(p => p.proveedorId === proveedorSel.id).length : 0;
-    const colorFondoEstado = getEstadoColorFondo(editOrden?.estado || (soloLectura ? 'COMPLETADA' : ''));
+    const colorFondoEstado = WIZARD_BAR_COLOR;
     const wizardStepsBar = (
       <View style={[styles.wizardStepsBar, { backgroundColor: colorFondoEstado, marginBottom: 0, justifyContent: 'flex-start', paddingLeft: 12 }]}>
         {pasos.map((label, idx) => {
@@ -829,7 +669,7 @@ export default function OrdenesScreen() {
             <View key={label} style={styles.wizardStepItem}>
               <Text style={[
                 styles.wizardStepText,
-                wizardStep === idx + 1 && styles.wizardStepTextActive
+                effectiveStep === idx + 1 && styles.wizardStepTextActive
               ]}>
                 {displayLabel}
               </Text>
@@ -854,29 +694,24 @@ export default function OrdenesScreen() {
             </Text>
           )}
         </View>
-        {!soloLectura && wizardStep === 3 && (
+        {effectiveStep === 3 && (
           <TouchableOpacity onPress={() => setShowAddProductoModal(true)} style={{ marginLeft: 8, padding: 4 }}>
-            <Ionicons name="add-circle-outline" size={20} color="#D7263D" />
+            <Ionicons name="add-circle-outline" size={30} color="#D7263D" />
           </TouchableOpacity>
         )}
       </View>
     );
-    // Paso 1: Seleccionar proveedor
-    if (wizardStep === 1) {
-      // Calcular el uso de cada proveedor
-      const proveedorUso: Record<string, number> = {};
-      ordenes.forEach(o => {
-        if (o.proveedorId) {
-          proveedorUso[o.proveedorId] = (proveedorUso[o.proveedorId] || 0) + 1;
-        }
-      });
-      // Filtrar proveedores por búsqueda
+    // Paso 1: Seleccionar proveedor (no-admin solo ve el proveedor cuyo nombre = parte antes del @)
+    if (effectiveStep === 1) {
+      const proveedoresDisponibles = !isAdmin(userData) && userData
+        ? proveedores.filter(p => (p.nombre ?? '').toLowerCase().trim() === getEmailPrefix(userData))
+        : proveedores;
       const proveedoresFiltrados = busquedaProveedor.trim() 
-        ? proveedores.filter(p => 
-            p.nombre.toLowerCase().includes(busquedaProveedor.toLowerCase()) ||
+        ? proveedoresDisponibles.filter(p => 
+            (p.nombre ?? '').toLowerCase().includes(busquedaProveedor.toLowerCase()) ||
             (p.tipo && p.tipo.toLowerCase().includes(busquedaProveedor.toLowerCase()))
           )
-        : proveedores;
+        : proveedoresDisponibles;
       
       // Ordenar proveedores: más usados primero, luego por nombre
       const proveedoresOrdenados = [...proveedoresFiltrados].sort((a, b) => {
@@ -888,31 +723,39 @@ export default function OrdenesScreen() {
 
     return (
         <View style={styles.wizardContainer}>
-          <Header title={soloLectura ? "Detalle Orden" : editOrden ? "Editar Orden" : "Nueva Orden"} />
+          <AppHeader 
+            title={editOrden?.id ? "Editar Orden" : "Nueva Orden"} 
+            showBackButton={false}
+            actions={[
+              { icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }
+            ]}
+          />
           {toast && (
             <View style={styles.toastRed}>
               <Text style={styles.toastRedText}>{toast.message}</Text>
             </View>
           )}
-          {wizardStepsBar}
-          {wizardSubHeader}
-          {/* Campo de búsqueda */}
-          <View style={{ marginHorizontal: 12, marginTop: 8, marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e0e0e0' }}>
-              <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
-              <TextInput
-                style={{ flex: 1, paddingVertical: 12, fontSize: 16, color: '#222' }}
-                placeholder="Buscar contacto..."
-                value={busquedaProveedor}
-                onChangeText={setBusquedaProveedor}
-                placeholderTextColor="#aaa"
-              />
+          <View style={{ flex: 1, minHeight: 0 }}>
+            {wizardStepsBar}
+            {wizardSubHeader}
+            {/* Campo de búsqueda */}
+            <View style={{ marginHorizontal: 12, marginTop: 8, marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e0e0e0' }}>
+                <Ionicons name="search" size={18} color="#888" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={{ flex: 1, paddingVertical: 12, fontSize: 16, color: '#222' }}
+                  placeholder="Buscar contacto..."
+                  value={busquedaProveedor}
+                  onChangeText={setBusquedaProveedor}
+                  placeholderTextColor="#aaa"
+                />
+              </View>
             </View>
-          </View>
-          <FlatList
-            data={proveedoresOrdenados}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
+            <FlatList
+              style={{ flex: 1 }}
+              data={proveedoresOrdenados}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
               <TouchableOpacity
                 style={[
                   styles.card,
@@ -921,30 +764,27 @@ export default function OrdenesScreen() {
                 ]}
                 onPress={async () => { 
                   setProveedorSel(item); 
-                  
-                  // Si es un cliente, cargar productos predeterminados disponibles
                   if (item.tipo === 'Cliente') {
                     try {
+                      showLoading();
                       const productosDefault = await getProductosDefaultCliente(item.id);
                       if (productosDefault.length > 0) {
-                        console.log('📋 Cargando productos predeterminados disponibles para cliente:', item.nombre);
-                        // Guardar productos predeterminados disponibles (sin marcar)
                         setProductosDefaultDisponibles(productosDefault);
-                        // No marcar automáticamente los productos
                         setProductosSel([]);
                       } else {
                         setProductosDefaultDisponibles([]);
                       }
-                      // Siempre ir al paso de tipo, incluso para clientes
                       setWizardStep(2);
                     } catch (error) {
-                      console.warn('⚠️ Error cargando productos predeterminados:', error);
+                      console.error('Error cargando productos predeterminados:', error);
                       setProductosDefaultDisponibles([]);
-                      setWizardStep(2); // Ir al paso de tipo en caso de error
+                      setWizardStep(2);
+                    } finally {
+                      hideLoading();
                     }
                   } else {
                     setProductosDefaultDisponibles([]);
-                    setWizardStep(2); // Para proveedores normales
+                    setWizardStep(2);
                   }
                 }}
               >
@@ -974,17 +814,24 @@ export default function OrdenesScreen() {
             )}
           />
           </View>
+        </View>
     );
   }
     // Paso 2: Seleccionar tipo
-    if (wizardStep === 2) {
+    if (effectiveStep === 2) {
     return (
         <View style={styles.wizardContainer}>
-          <Header title={soloLectura ? "Detalle Orden" : editOrden ? "Editar Orden" : "Nueva Orden"} />
+          <AppHeader 
+            title={editOrden?.id ? "Editar Orden" : "Nueva Orden"} 
+            showBackButton={false}
+            actions={[
+              { icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }
+            ]}
+          />
           {toast && (
             <View style={styles.toastRed}>
               <Text style={styles.toastRedText}>{toast.message}</Text>
-          </View>
+            </View>
           )}
           {wizardStepsBar}
           {wizardSubHeader}
@@ -1008,7 +855,6 @@ export default function OrdenesScreen() {
                     } else if (key === 'SUGERIDA') {
                       // Para sugerida, generar sugerencias basadas en historial
                       if (proveedorSel) {
-                        console.log('💡 Generando sugerencias para:', proveedorSel.nombre);
                         const sugerencias = generarSugerenciasOrden(proveedorSel.id, ordenes, productos);
                         setProductosSugeridos(sugerencias);
                         
@@ -1019,8 +865,6 @@ export default function OrdenesScreen() {
                           unidad: sug.unidadSugerida
                         }));
                         setProductosSel(productosAutoSeleccionados);
-                        
-                        console.log('📋 Productos sugeridos auto-seleccionados:', productosAutoSeleccionados.length);
                       }
                       setWizardStep(3);
                     } else {
@@ -1042,8 +886,7 @@ export default function OrdenesScreen() {
               <FlatList
                 data={ordenes.filter(o => 
                   o.proveedorId === proveedorSel.id && 
-                  (o.estado === 'COMPLETADA' || o.estado === 'RECHAZADA') &&
-                  o.tipo !== 'AUTOMATICA'  // Excluir órdenes automáticas
+                  o.tipo !== 'AUTOMATICA'
                 )}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => (
@@ -1072,14 +915,14 @@ export default function OrdenesScreen() {
                     <Text style={{ color: '#888', fontSize: 13 }}>Tipo: {item.tipo}</Text>
               </View>
             </TouchableOpacity>
-                )}
-                ListEmptyComponent={<Text style={{ color: '#888', fontStyle: 'italic', marginTop: 8 }}>No hay órdenes completadas o rechazadas para este proveedor.</Text>}
-                style={{ flexGrow: 0 }}
-                contentContainerStyle={{ paddingBottom: 0 }}
-              />
-            </View>
-          )}
-        </View>
+              )}
+              ListEmptyComponent={<Text style={{ color: '#888', fontStyle: 'italic', marginTop: 8 }}>No hay órdenes para duplicar de este proveedor.</Text>}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ paddingBottom: 0 }}
+            />
+          </View>
+        )}
+      </View>
     );
   }
     // Paso 3: Seleccionar productos
@@ -1093,7 +936,6 @@ export default function OrdenesScreen() {
           .filter((p): p is Producto => p !== undefined && !productosProveedor.some(pp => pp.id === p.id));
         
         productosProveedor = [...productosProveedor, ...productosDefaultCompletos];
-        console.log('📋 Productos predeterminados agregados a la lista:', productosDefaultCompletos.length);
       }
       
       // Para órdenes sugeridas: incluir productos sugeridos que no estén ya en la lista
@@ -1103,36 +945,70 @@ export default function OrdenesScreen() {
           .filter(p => !productosProveedor.some(pp => pp.id === p.id));
         
         productosProveedor = [...productosProveedor, ...productosSugeridosCompletos];
-        console.log('💡 Productos sugeridos agregados a la lista:', productosSugeridosCompletos.length);
       }
       
       const otrosProductos = productosSel
         .filter(p => !productosProveedor.some(pp => pp.id === p.id))
-        .map(p => productos.find(prod => prod.id === p.id))
-        .filter((p): p is Producto => p !== undefined);
+        .map(p => {
+          const found = productos.find(prod => prod.id === p.id);
+          if (found) return found;
+          // Al editar: si el producto no está en el catálogo, usar nombre guardado en la orden
+          if (proveedorSel && editOrden?.productos) {
+            const enOrden = editOrden.productos.find((pr: any) => (pr.id || pr.productoId) === p.id);
+            const nombreEnOrden = (enOrden as any)?.nombre;
+            if (nombreEnOrden) {
+              return {
+                id: p.id,
+                nombre: nombreEnOrden,
+                orden: 0,
+                precio: 0,
+                proveedorId: proveedorSel.id,
+                stock: 0,
+                unidad: p.unidad || 'UNIDAD'
+              } as Producto;
+            }
+          }
+          return null;
+        })
+        .filter((p): p is Producto => p !== null && p !== undefined);
       
+      const nom = (x: Producto) => (x as any).nombre ?? (x as any).name ?? '';
       productosProveedor = [...productosProveedor, ...otrosProductos].sort((a, b) => {
+        const nomA = nom(a);
+        const nomB = nom(b);
         if (a.proveedorId === b.proveedorId) {
           if (a.orden !== undefined && b.orden !== undefined) return a.orden - b.orden;
-          return a.nombre.localeCompare(b.nombre);
+          return nomA.localeCompare(nomB);
         }
         if (a.proveedorId === proveedorSel.id) return -1;
         if (b.proveedorId === proveedorSel.id) return 1;
-        return a.nombre.localeCompare(b.nombre);
+        return nomA.localeCompare(nomB);
       });
+
+      // Helper: nombre del producto (soporta nombre o name por compatibilidad)
+      const nombreProd = (p: Producto) => (p as any).nombre ?? (p as any).name ?? '';
 
       // Filtrar productos según la búsqueda y el checkbox
       productosProveedor = productosProveedor.filter(p => {
         if (!busquedaOrden) return !soloSeleccionados || productosSel.some(sel => sel.id === p.id);
 
         const proveedor = proveedores.find(prov => prov.id === p.proveedorId);
-        const nombreMatch = containsSearchTerm(p.nombre, busquedaOrden);
+        const nombreMatch = containsSearchTerm(nombreProd(p), busquedaOrden);
         const proveedorMatch = proveedor ? containsSearchTerm(proveedor.nombre, busquedaOrden) : false;
 
         const matchesSearch = nombreMatch || proveedorMatch;
         const matchesFilter = !soloSeleccionados || productosSel.some(sel => sel.id === p.id);
 
         return matchesSearch && matchesFilter;
+      });
+
+      // OFERTA primero: productos cuyo nombre empieza por "OFERTA" al inicio
+      productosProveedor = [...productosProveedor].sort((a, b) => {
+        const aOferta = (nombreProd(a) || '').trim().toUpperCase().startsWith('OFERTA');
+        const bOferta = (nombreProd(b) || '').trim().toUpperCase().startsWith('OFERTA');
+        if (aOferta && !bOferta) return -1;
+        if (!aOferta && bOferta) return 1;
+        return 0;
       });
 
       // Calcular el importe total de los productos seleccionados para el detalle
@@ -1147,21 +1023,79 @@ export default function OrdenesScreen() {
       // Sub-header con proveedor y tipo (sin el importe)
       const wizardSubHeader = (
         <View style={[styles.wizardSubHeader, { backgroundColor: colorFondoEstado, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }] }>
-          <View>
+          <View style={{ flex: 1 }}>
             {proveedorSel && (
               <Text style={{ color: '#888', fontSize: 13 }}>
                 {proveedorSel.nombre}
               </Text>
             )}
             {tipoSel && (
-              <Text style={{ color: '#aaa', fontSize: 12 }}>
-                Tipo: {ORDENES_TIPOS[tipoSel as keyof typeof ORDENES_TIPOS]}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <Text style={{ color: '#aaa', fontSize: 12 }}>
+                  Tipo: {ORDENES_TIPOS[tipoSel as keyof typeof ORDENES_TIPOS]}
+                </Text>
+                {wizardStep === 3 && (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      if (Platform.OS === 'android') {
+                        // Usar DateTimePickerAndroid para Android
+                        const fechaActual = fechaOrden || obtenerFechaActual();
+                        let fechaDate: Date;
+                        
+                        try {
+                          if (fechaActual.includes('-')) {
+                            const [fechaPart, horaPart] = fechaActual.split(' ');
+                            const [dia, mes, año] = fechaPart.split('-');
+                            if (horaPart) {
+                              const [hora, minuto, segundo] = horaPart.split(':');
+                              fechaDate = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia), parseInt(hora), parseInt(minuto), parseInt(segundo));
+                            } else {
+                              fechaDate = new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+                            }
+                          } else {
+                            fechaDate = new Date(fechaActual);
+                          }
+                        } catch {
+                          fechaDate = new Date();
+                        }
+                        
+                        DateTimePickerAndroid.open({
+                          value: fechaDate,
+                          mode: 'datetime',
+                          is24Hour: true,
+                          onChange: (event, selectedDate) => {
+                            if (event.type === 'set' && selectedDate) {
+                              const dia = selectedDate.getDate().toString().padStart(2, '0');
+                              const mes = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+                              const año = selectedDate.getFullYear();
+                              const hora = selectedDate.getHours().toString().padStart(2, '0');
+                              const minuto = selectedDate.getMinutes().toString().padStart(2, '0');
+                              const segundo = selectedDate.getSeconds().toString().padStart(2, '0');
+                              
+                              const nuevaFechaTexto = `${dia}-${mes}-${año} ${hora}:${minuto}:${segundo}`;
+                              setFechaOrden(nuevaFechaTexto);
+                            }
+                          }
+                        });
+                      } else {
+                        // iOS: usar el componente normal
+                        const fechaFormateada = formatearFecha(fechaOrden || obtenerFechaActual());
+                        setFechaInputText(fechaFormateada);
+                        setEditandoFecha(true);
+                      }
+                    }}
+                  >
+                    <Text style={{ color: '#D7263D', fontSize: 12, textDecorationLine: 'underline' }}>
+                      {formatearFecha(fechaOrden || obtenerFechaActual())}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
-          {!soloLectura && wizardStep === 3 && (
+          {wizardStep === 3 && (
             <TouchableOpacity onPress={() => setShowAddProductoModal(true)} style={{ marginLeft: 8, padding: 4 }}>
-              <Ionicons name="add-circle-outline" size={20} color="#D7263D" />
+              <Ionicons name="add-circle-outline" size={30} color="#D7263D" />
             </TouchableOpacity>
           )}
         </View>
@@ -1186,30 +1120,13 @@ export default function OrdenesScreen() {
           }}
         >
           <View style={styles.wizardContainer}>
-            <Header 
-              title={soloLectura ? "Detalle Orden" : editOrden ? "Editar Orden" : "Nueva Orden"}
-              subtitle={
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  {importeTotalDetalle > 0 && (
-                    <Text style={{ color: '#fff', fontWeight: '500', fontSize: 13, opacity: 0.85 }}>
-                      Total: ${importeTotalDetalle.toFixed(2)}
-                    </Text>
-                  )}
-                  <TouchableOpacity 
-                    onLongPress={() => {
-                      if (!soloLectura) {
-                        setFechaInputText(formatearFecha(fechaOrden));
-                        setEditandoFecha(true);
-                      }
-                    }}
-                    style={{ flex: 1, alignItems: 'flex-end' }}
-                  >
-                    <Text key={fechaUpdateTrigger} style={{ color: '#fff', fontWeight: '500', fontSize: 13, opacity: 0.85 }}>
-                      {formatearFecha(fechaOrden)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              }
+            <AppHeader 
+              title={editOrden?.id ? "Editar Orden" : "Nueva Orden"}
+              showBackButton={false}
+              actions={[
+                { icon: 'ellipsis-horizontal', onPress: () => setShowActionsModal(true), size: 28 },
+                { icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }
+              ]}
             />
             {toast && (
               <View style={styles.toastRed}>
@@ -1242,9 +1159,9 @@ export default function OrdenesScreen() {
             <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() => {
-                  if (!soloLectura) setSoloSeleccionados(!soloSeleccionados);
+                  setSoloSeleccionados(!soloSeleccionados);
                 }}
-                disabled={soloLectura}
+                disabled={false}
             >
                 <View style={[styles.checkbox, soloSeleccionados && styles.checkboxSelected]}>
                   {soloSeleccionados && <Ionicons name="checkmark" size={16} color="#fff" />}
@@ -1253,46 +1170,43 @@ export default function OrdenesScreen() {
             </TouchableOpacity>
           </View>
             <View style={{ height: 4 }} />
-            <DraggableFlatList
-              data={productosProveedor}
-              keyExtractor={item => item.id}
+            <View style={{ flex: 1 }}>
+              <DraggableFlatList
+                data={productosProveedor}
+                keyExtractor={item => item.id}
+                initialNumToRender={15}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
               onDragEnd={({ data }) => {
-                // Solo reordenar localmente
-                setProductos(data);
-                // Actualizar el orden en Firebase inmediatamente
-                const productosProveedor = data.filter(p => p.proveedorId === proveedorSel.id);
-                setProcesandoOrden(true);
-                setOrdenProgreso({actual: productosProveedor.length, total: productosProveedor.length, nombre: 'Marcando Producto'});
-                updateProductosOrdenBatch(productosProveedor.map((p, i) => ({ id: p.id, orden: i })))
+                const ordenById = new Map(data.map((p, i) => [p.id, i]));
+                setProductos(prev => prev.map(p => ordenById.has(p.id) ? { ...p, orden: ordenById.get(p.id)! } : p));
+                const productosDelProveedor = data.filter(p => p.proveedorId === proveedorSel.id);
+                showLoading();
+                updateProductosOrdenBatch(productosDelProveedor.map((p, i) => ({ id: p.id, data: { orden: i } })))
                   .then(() => {
-                    // Refrescar la lista de productos desde la base de datos
                     getProductos((productosData) => {
                       setProductos(productosData);
                       setProductosWizardOrdenOriginal(productosData);
-                      // Esperar un momento antes de ocultar el indicador para asegurar que se vea
-                      setTimeout(() => {
-                        setProcesandoOrden(false);
-                        setOrdenProgreso(null);
-                      }, 1000);
+                      setTimeout(() => hideLoading(), 1000);
                     });
                   })
                   .catch(error => {
                     console.error('Error al actualizar el orden:', error);
                     Alert.alert('Error', 'No se pudo actualizar el orden de los productos');
-                    // Esperar un momento antes de ocultar el indicador en caso de error
-                    setTimeout(() => {
-                      setProcesandoOrden(false);
-                      setOrdenProgreso(null);
-                    }, 1000);
+                    setTimeout(() => hideLoading(), 1000);
                   });
               }}
               renderItem={({ item, drag, isActive }) => {
                 const seleccionado = productosSel.find(p => p.id === item.id);
                 const esOtroProveedor = item.proveedorId !== proveedorSel.id;
+                // Nombre: del item (nombre o name), de la orden al editar, o fallback
+                const nombreDelItem = (item as any).nombre ?? (item as any).name;
+                const nombreEnOrden = editOrden?.productos?.find((pr: any) => (pr.id || pr.productoId) === item.id) as any;
+                const nombreProducto = (nombreDelItem && String(nombreDelItem).trim()) || (nombreEnOrden?.nombre && String(nombreEnOrden.nombre).trim()) || 'Producto';
+                const esOferta = (nombreProducto || '').trim().toUpperCase().startsWith('OFERTA');
                 
                 const handlePress = () => {
-                  if (soloLectura) return;
-                  
                   const now = Date.now();
                   const DOUBLE_TAP_DELAY = 600;
                   
@@ -1309,49 +1223,34 @@ export default function OrdenesScreen() {
                                     lastTap.id === item.id && 
                                     (now - lastTap.timestamp) < DOUBLE_TAP_DELAY;
                   
-                  console.log('🔍 Tap detectado:', { 
-                    productId: item.id,
-                    nombre: item.nombre,
-                    isSelected,
-                    isDoubleTap,
-                    lastTap: lastTap,
-                    timeDiff: lastTap ? now - lastTap.timestamp : null,
-                    procesando: productoCalculando === item.id
-                  });
-
                   // Si está siendo procesado, ignorar
                   if (productoCalculando === item.id) {
-                    console.log('⚠️ Tap ignorado - producto procesándose');
                     return;
                   }
 
                   if (isSelected) {
                     if (isDoubleTap) {
                       // DOBLE TAP: Desmarcar producto
-                      console.log('🔄 DOBLE TAP - Desmarcando producto:', item.nombre);
-                      setUpdateAction('desmarcando');
-                      setIsUpdating(true);
                       setProductoCalculando(item.id);
                       lastTapRef.current = null; // Limpiar inmediatamente
                       
                       // Desmarcar inmediatamente
                       setProductosSel(prev => prev.filter(p => p.id !== item.id));
                       
+                      // Si es un producto temporal, eliminarlo de la lista de productos
+                      if (item.id.startsWith('temp_')) {
+                        setProductos(prev => prev.filter(p => p.id !== item.id));
+                      }
+                      
                       setTimeout(() => {
                         setProductoCalculando(null);
-                        setIsUpdating(false);
-                        console.log('✅ Producto desmarcado:', item.nombre);
                       }, 500);
                     } else {
                       // PRIMER TAP en producto seleccionado: Registrar para posible doble tap
-                      console.log('👆 Primer tap en producto seleccionado - registrando para doble tap');
                       lastTapRef.current = { id: item.id, timestamp: now };
                     }
                   } else {
                     // TAP en producto NO seleccionado: Agregar
-                    console.log('➕ Agregando producto:', item.nombre);
-                    setUpdateAction('marcando');
-                    setIsUpdating(true);
                     setProductoCalculando(item.id);
                     
                     // Agregar inmediatamente
@@ -1367,13 +1266,10 @@ export default function OrdenesScreen() {
                       // Usar cantidad y unidad predefinidas (clientes)
                       cantidadDefault = productoPredeterminado.cantidad;
                       unidadDefault = productoPredeterminado.unidad;
-                      console.log('📋 Usando cantidad predeterminada:', cantidadDefault, unidadDefault);
                     } else if (productoSugerido) {
                       // Usar cantidad y unidad sugeridas (órdenes sugeridas)
                       cantidadDefault = productoSugerido.cantidadSugerida.toString();
                       unidadDefault = productoSugerido.unidadSugerida;
-                      console.log('💡 Usando cantidad sugerida:', cantidadDefault, unidadDefault, 
-                        `(promedio: ${productoSugerido.promedioCalculado.toFixed(2)}, órdenes: ${productoSugerido.ordenesAnalizadas})`);
                     } else {
                       // Usar lógica original
                       cantidadDefault = productoInfo && productoInfo.stock !== undefined ? String(productoInfo.stock) : '1';
@@ -1387,8 +1283,6 @@ export default function OrdenesScreen() {
                     
                     setTimeout(() => {
                       setProductoCalculando(null);
-                      setIsUpdating(false);
-                      console.log('✅ Producto agregado:', item.nombre);
                     }, 500);
                   }
                 };
@@ -1396,11 +1290,11 @@ export default function OrdenesScreen() {
                 const hoy = new Date();
                 const tresMesesAtras = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
                 const ordenesUltimos3Meses = ordenes.filter(o => {
-                  const fechaO = parseFecha(o.fecha);
+                  const fechaO = parseFechaOrden(o.fecha);
                   return fechaO >= tresMesesAtras && fechaO <= hoy && Array.isArray(o.productos) && (o.productos as ProductoOrden[]).some((p: ProductoOrden) => p.productoId === item.id);
                 });
                 // Ordenar por fecha descendente
-                ordenesUltimos3Meses.sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime());
+                ordenesUltimos3Meses.sort((a, b) => parseFechaOrden(b.fecha).getTime() - parseFechaOrden(a.fecha).getTime());
                 const comprasProducto = ordenesUltimos3Meses
                   .map(o => Array.isArray(o.productos) ? (o.productos as ProductoOrden[]).find((p: ProductoOrden) => p.productoId === item.id) : null)
                   .filter((prod): prod is ProductoOrden => !!prod && typeof prod.cantidad === 'string' && !isNaN(Number(prod.cantidad)))
@@ -1500,22 +1394,14 @@ export default function OrdenesScreen() {
                             
                             if (seleccionado) {
                               // Desmarcar producto directamente
-                              console.log('🔄 Swipe - Desmarcando producto:', item.nombre);
-                              setUpdateAction('desmarcando');
-                              setIsUpdating(true);
                               setProductoCalculando(item.id);
                               
                               setTimeout(() => {
                                 setProductosSel(prev => prev.filter(p => p.id !== item.id));
                                 setProductoCalculando(null);
-                                setIsUpdating(false);
-                                console.log('✅ Producto desmarcado via swipe:', item.nombre);
                               }, 1000);
                             } else {
                               // Marcar producto directamente
-                              console.log('🔄 Swipe - Agregando producto:', item.nombre);
-                              setUpdateAction('marcando');
-                              setIsUpdating(true);
                               setProductoCalculando(item.id);
                               
                               setTimeout(() => {
@@ -1523,8 +1409,6 @@ export default function OrdenesScreen() {
                                 const cantidadDefault = productoInfo && productoInfo.stock !== undefined ? String(productoInfo.stock) : '1';
                                 setProductosSel(prev => [...prev, { id: item.id, cantidad: cantidadDefault, unidad: item.unidad }]);
                                 setProductoCalculando(null);
-                                setIsUpdating(false);
-                                console.log('✅ Producto agregado via swipe:', item.nombre);
                               }, 1500);
                             }
                           }}
@@ -1549,6 +1433,12 @@ export default function OrdenesScreen() {
                         seleccionado && { borderColor: '#D7263D' },
                         !seleccionado && { paddingVertical: 12, backgroundColor: '#f0f0f0' },
                         esOtroProveedor && styles.cardOtroProveedor,
+                        esOferta && {
+                          backgroundColor: '#fff8e6',
+                          borderColor: '#f0ad4e',
+                          borderWidth: 2,
+                          borderRadius: 6
+                        },
                         isActive && {
                           backgroundColor: '#f0f7ff',
                           borderColor: '#007AFF',
@@ -1564,7 +1454,7 @@ export default function OrdenesScreen() {
                       ]}
                       onPress={handlePress}
                       onLongPress={() => {
-                        if (!soloLectura) {
+                        {
                           setIsDraggingEnabled(true);
                           dragTimeout.current = setTimeout(() => {
                             drag();
@@ -1583,7 +1473,7 @@ export default function OrdenesScreen() {
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, flexGrow: 1 }}>
                             <Ionicons name="cube" size={15} color="#D7263D" style={{ marginRight: 4 }} />
-                            <Text style={[styles.proveedor, { fontSize: 15, flex: 1 }, esOtroProveedor && { color: '#888' }]} numberOfLines={1} ellipsizeMode="tail">{item.nombre}</Text>
+                            <Text style={[styles.proveedor, { fontSize: 15, flex: 1 }, esOtroProveedor && { color: '#888' }]} numberOfLines={1} ellipsizeMode="tail">{nombreProducto}</Text>
                           </View>
                           {esOtroProveedor && (
                             <Text style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>
@@ -1630,12 +1520,8 @@ export default function OrdenesScreen() {
                       </View>
                       {seleccionado && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                          {/* Cantidad y unidad: solo lectura o editable, con warning */}
-                          {soloLectura ? (
-                            <>
-                            <Text style={styles.productoCantidadUnidad}>{seleccionado.cantidad} {seleccionado.unidad}</Text>
-                            </>
-                          ) : editingCantidad === item.id ? (
+                          {/* Cantidad y unidad editable */}
+                          {editingCantidad === item.id ? (
                             <>
                           <TextInput
                                 style={[styles.productoCantidadUnidad, styles.cantidadInput]}
@@ -1710,7 +1596,8 @@ export default function OrdenesScreen() {
                 );
               }}
               contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 320 }}
-            />
+              />
+            </View>
           </View>
         </TouchableWithoutFeedback>
     );
@@ -1720,117 +1607,74 @@ export default function OrdenesScreen() {
 
   // Guardar o actualizar orden
   const handleSaveOrden = async () => {
-    console.log('Iniciando handleSaveOrden');
     if (!proveedorSel) {
-      console.log('No hay proveedor seleccionado');
       setToast({ message: 'Selecciona un proveedor.', type: 'error' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
       return;
     }
     if (!tipoSel) {
-      console.log('No hay tipo seleccionado');
       setToast({ message: 'Selecciona un tipo de orden.', type: 'error' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
       return;
     }
     if (productosSel.length === 0) {
-      console.log('No hay productos seleccionados');
       setToast({ message: 'Selecciona al menos un producto.', type: 'error' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
       return;
     }
-    console.log('Obteniendo responsable');
     const responsable = await getResponsableOrAlert();
     if (!responsable) {
-      console.log('No se pudo obtener el responsable');
       return;
     }
-    console.log('Preparando datos de la orden');
     const ordenData: Omit<Orden, 'id'> = {
       proveedorId: proveedorSel.id,
       proveedorNombre: proveedorSel.nombre,
       fecha: fechaOrden || obtenerFechaActual(),
       tipo: tipoSel as any,
-      estado: 'PENDIENTE',
+      estado: editOrden?.estado || 'PENDIENTE',
       productos: productosSel.map(p => {
         const productoInfo = productos.find(prod => prod.id === p.id);
+        const nombreProducto = productoInfo?.nombre || 'Producto desconocido';
+        const precioProducto = productoInfo?.precio ?? 0;
+        
         return {
           id: p.id,
-          nombre: productoInfo?.nombre || 'Producto desconocido',
+          nombre: nombreProducto,
           cantidad: parseFloat(p.cantidad) || 0,
           unidad: p.unidad,
-          precio: productoInfo?.precio || 0,
-          subtotal: (parseFloat(p.cantidad) || 0) * (productoInfo?.precio || 0)
+          precio: precioProducto,
+          subtotal: (parseFloat(p.cantidad) || 0) * precioProducto
         };
       }),
       total: productosSel.reduce((sum, p) => {
         const productoInfo = productos.find(prod => prod.id === p.id);
-        return sum + ((parseFloat(p.cantidad) || 0) * (productoInfo?.precio || 0));
+        const precioProducto = productoInfo?.precio ?? 0;
+        return sum + ((parseFloat(p.cantidad) || 0) * precioProducto);
       }, 0),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    console.log('Datos de la orden preparados:', ordenData);
-    console.log('🔍 Fecha de la orden:', {
-      editOrden: !!editOrden,
-      fechaOrden,
-      fechaFinal: ordenData.fecha,
-      fechaActual: obtenerFechaActual(),
-      esActualizacion: !!editOrden
-    });
     try {
+      showLoading();
       let ordenId: string;
-      let tipoEvento: string;
-      if (editOrden) {
-        console.log('Actualizando orden existente');
-        
+      const esActualizacion = editOrden && typeof editOrden.id === 'string' && editOrden.id.length > 0;
+      if (esActualizacion) {
         // Mostrar indicador si es una orden de cliente
         if (proveedorSel?.tipo === 'Cliente') {
-          setCreandoOrdenesProduccion(true);
         }
         
-        await updateOrden(editOrden.id, { ...ordenData, id: editOrden.id });
-        ordenId = editOrden.id;
-        tipoEvento = 'actualizacion_orden';
+        await updateOrden(editOrden!.id, { ...ordenData, id: editOrden!.id });
+        ordenId = editOrden!.id;
         
-        // Ocultar indicador después de completar
-        if (proveedorSel?.tipo === 'Cliente') {
-          setTimeout(() => {
-            setCreandoOrdenesProduccion(false);
-          }, 1500);
-        }
       } else {
-        console.log('Creando nueva orden');
+        // Generar ID único para la nueva orden
+        ordenId = Date.now().toString();
         
-        // Mostrar indicador si es una orden de cliente
-        if (proveedorSel?.tipo === 'Cliente') {
-          setCreandoOrdenesProduccion(true);
-        }
-        
-        const nuevaOrden = await saveOrden(ordenData);
-        console.log('Nueva orden creada con ID:', nuevaOrden);
-        ordenId = nuevaOrden;
-        tipoEvento = 'creacion_orden';
-        
-        // Notificar si la orden es pendiente
-        if (ordenData.estado === 'PENDIENTE') {
-          console.log('Lanzando notificación push de orden pendiente...');
-          const ordenCompleta = { ...ordenData, id: nuevaOrden };
-          await notificarOrdenPendiente(ordenCompleta, proveedores);
-        }
-        
-        // Ocultar indicador después de completar
-        if (proveedorSel?.tipo === 'Cliente') {
-          // Pequeño delay para que el usuario vea que se completó
-          setTimeout(() => {
-            setCreandoOrdenesProduccion(false);
-          }, 1500);
-        }
+        await saveOrden({ ...ordenData, id: ordenId });
       }
-      console.log('Cerrando wizard y limpiando estados');
       setWizardVisible(false);
       setEditOrden(null);
       setProveedorSel(null);
@@ -1844,16 +1688,14 @@ export default function OrdenesScreen() {
       
       // Marcar que acabamos de crear/actualizar una orden para evitar recargas
       setJustCreatedOrder(true);
-      console.log('🔒 Protegiendo filtros después de', editOrden ? 'actualizar' : 'crear', 'orden');
       
       // Resetear el flag después de un delay
       setTimeout(() => {
-        console.log('🔒 Delay completado - Wizard cerrado completamente');
         setJustCreatedOrder(false);
       }, 500);
       
       // Agregar la nueva orden a la lista existente en lugar de recargar todo
-      if (!editOrden) {
+      if (!esActualizacion) {
         // Es una nueva orden, agregarla al inicio de la lista solo si no existe ya
         const nuevaOrdenCompleta: Orden = {
           id: ordenId,
@@ -1863,16 +1705,11 @@ export default function OrdenesScreen() {
           // Verificar si la orden ya existe para evitar duplicados
           const ordenExiste = prevOrdenes.some(orden => orden.id === ordenId);
           if (ordenExiste) {
-            console.log('⚠️ Orden ya existe en la lista, no duplicando:', ordenId);
             return prevOrdenes;
           }
-          console.log('✅ Nueva orden agregada a la lista:', {
-            ordenId,
-            totalOrdenes: prevOrdenes.length + 1
-          });
           return [nuevaOrdenCompleta, ...prevOrdenes];
         });
-      } else {
+      } else if (editOrden) {
         // Es una edición, actualizar la orden existente en la lista
         setOrdenes(prevOrdenes => 
           prevOrdenes.map(orden => 
@@ -1881,10 +1718,6 @@ export default function OrdenesScreen() {
               : orden
           )
         );
-        console.log('✅ Orden actualizada en la lista:', {
-          ordenId: editOrden.id,
-          totalOrdenes: ordenes.length
-        });
       }
       
       // Resaltar la orden por 3 segundos
@@ -1893,20 +1726,6 @@ export default function OrdenesScreen() {
       highlightTimeout.current = setTimeout(() => {
         setHighlightedOrdenId(null);
       }, 3000);
-
-      // Registrar evento
-      console.log('Registrando evento');
-      await logEvento({ tipoEvento, responsable, idAfectado: ordenId, datosJSON: { ...ordenData, id: ordenId } });
-      console.log('Proceso completado exitosamente');
-      
-      // Verificar que el filtro se mantiene después de guardar
-      console.log('🔍 Estado del filtro después de guardar:', {
-        filtroActual: filtro,
-        proveedorFiltro,
-        totalOrdenes: ordenes.length,
-        wizardVisible: false,
-        esActualizacion: !!editOrden
-      });
       
       // Asegurar que no se recarguen los datos automáticamente
       setShouldReloadData(false);
@@ -1915,11 +1734,8 @@ export default function OrdenesScreen() {
       setToast({ message: 'No se pudo guardar la orden.', type: 'error' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
-      
-      // Ocultar indicador de órdenes de producción en caso de error
-      if (creandoOrdenesProduccion) {
-        setCreandoOrdenesProduccion(false);
-      }
+    } finally {
+      hideLoading();
     }
   };
 
@@ -1929,13 +1745,12 @@ export default function OrdenesScreen() {
     const responsable = await getResponsableOrAlert();
     if (!responsable) return;
     try {
+      showLoading();
       await deleteOrden(editOrden.id);
       setToast({ message: 'Orden eliminada', type: 'success' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
-      // Remover la orden de la lista local
       setOrdenes(prevOrdenes => prevOrdenes.filter(orden => orden.id !== editOrden.id));
-      
       setWizardVisible(false);
       setEditOrden(null);
       setProveedorSel(null);
@@ -1943,199 +1758,67 @@ export default function OrdenesScreen() {
       setProductosSel([]);
       setProductosDefaultDisponibles([]);
       setProductosSugeridos([]);
-
-      // Registrar evento
-      await logEvento({ tipoEvento: 'eliminacion_orden', responsable, idAfectado: editOrden.id, datosJSON: editOrden });
     } catch (e) {
       setToast({ message: 'No se pudo eliminar la orden', type: 'error' });
       if (toastTimeout.current) clearTimeout(toastTimeout.current);
       toastTimeout.current = setTimeout(() => setToast(null), 2500);
-      }
-    };
-
-  // Cambiar estado de la orden
-  const handleChangeEstado = async (nuevoEstado: string) => {
-    if (!ordenEstadoEdit) return;
-    try {
-      await updateOrden(ordenEstadoEdit.id, { ...ordenEstadoEdit, estado: nuevoEstado });
-      // Actualizar la orden en la lista local
-      setOrdenes(prevOrdenes => 
-        prevOrdenes.map(orden => 
-          orden.id === ordenEstadoEdit.id 
-            ? { ...orden, estado: nuevoEstado }
-            : orden
-        )
-      );
-    } catch (e) {
-      console.error('Error al actualizar el estado:', e);
+    } finally {
+      hideLoading();
     }
-    setShowEstadoModal(false);
-    setOrdenEstadoEdit(null);
   };
 
   const renderFooter = () => {
-    // Determinar si la orden debe estar en solo lectura
-    let isFinalizada = false;
-    if (editOrden) {
-      const proveedor = proveedores.find(p => p.id === editOrden.proveedorId);
-      const esProductor = proveedor?.tipo === 'Productor';
-      const estadoNormalizado = editOrden.estado?.trim().toUpperCase();
-      
-      // Solo COMPLETADA y RECHAZADA están finalizadas para todos
-      // ENVIADA / IMPRESA solo está finalizada si NO es productor
-      if (estadoNormalizado === 'COMPLETADA' || estadoNormalizado === 'RECHAZADA') {
-        isFinalizada = true;
-      } else if (estadoNormalizado === 'ENVIADA / IMPRESA' && !esProductor) {
-        isFinalizada = true;
-      }
-      
-      console.log('🔍 RENDER FOOTER - Lógica de finalización:', {
-        ordenId: editOrden.id,
-        estadoOriginal: editOrden.estado,
-        estadoNormalizado,
-        proveedorNombre: proveedor?.nombre,
-        proveedorTipo: proveedor?.tipo,
-        esProductor,
-        isFinalizada,
-        deberiaSerEditable: !isFinalizada
-      });
-    }
-    if (isFinalizada) {
-      return (
-        <View style={styles.wizardFooterRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {/* Solo mostrar botón cancelar si NO está en modo solo lectura */}
-            {!soloLectura && (
+    const isEditing = !!editOrden?.id;
+    return (
+      <>
+        <FormFooterButtons
+            onCancel={() => {
+              if (!editOrden?.id && productosSel.length === 0) {
+                closeWizard();
+              } else {
+                setShowCancelModal(true);
+              }
+            }}
+            onSave={handleSaveOrden}
+            saveText={isEditing ? `Actualizar (${productosSel.length})` : `Crear (${productosSel.length})`}
+            saveIcon={isEditing ? "save" : "create"}
+            disabled={productosSel.length === 0}
+            hideSaveWhenDisabled={!isEditing}
+            customLeftButton={isEditing ? (
               <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonSecondary]}
-                onPress={() => {
-                  Alert.alert(
-                    'Cancelar',
-                    '¿Estás seguro de que deseas cancelar?',
-                    [
-                      { text: 'No', style: 'cancel' },
-                      { text: 'Sí', onPress: closeWizard }
-                    ]
-                  );
-                }}
-              >
-                <Ionicons name="close" size={24} color="#D7263D" />
-              </TouchableOpacity>
-            )}
-            {editOrden && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.actionButtonSecondary]}
+                style={[styles.actionButton, styles.actionButtonSecondary, styles.floatingMenuButton]}
                 onPress={() => {
                   if (editOrden) {
                     setProveedorSel(proveedores.find(p => p.id === editOrden.proveedorId) || null);
                   }
                   setShowActionsModal(true);
                 }}
+                activeOpacity={0.8}
               >
-                <Ionicons name="ellipsis-horizontal" size={24} color="#D7263D" />
+                <View style={styles.actionButtonContent}>
+                  <Ionicons name="ellipsis-vertical" size={24} color="#D7263D" />
+                </View>
               </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonPrimary]}
-            onPress={closeWizard}
-          >
-            <View style={styles.actionButtonContent}>
-              <Ionicons name="checkmark" size={20} color="#fff" style={styles.actionButtonIcon} />
-              <Text style={styles.actionButtonText}>Cerrar ({productosSel.length})</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.wizardFooterRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonSecondary]}
-            onPress={() => {
-              Alert.alert(
-                'Cancelar',
-                '¿Estás seguro de que deseas cancelar?',
-                [
-                  { text: 'No', style: 'cancel' },
-                  { text: 'Sí', onPress: closeWizard }
-                ]
-              );
-            }}
-          >
-            <Ionicons name="close" size={24} color="#D7263D" />
-          </TouchableOpacity>
-          {editOrden && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonSecondary]}
-              onPress={() => {
-                if (editOrden) {
-                  setProveedorSel(proveedores.find(p => p.id === editOrden.proveedorId) || null);
-                }
-                setShowActionsModal(true);
-              }}
-            >
-              <Ionicons name="ellipsis-horizontal" size={24} color="#D7263D" />
-            </TouchableOpacity>
-          )}
-        </View>
-        {(() => {
-          const deberiaMostrarBoton = !soloLectura;
-          console.log('🔍 BOTONERA - Estado actual:', {
-            soloLectura,
-            tipoSoloLectura: typeof soloLectura,
-            editOrden: !!editOrden,
-            productosSelLength: productosSel.length,
-            mostrarBotonActualizar: deberiaMostrarBoton,
-            estadoOrden: editOrden?.estado,
-            valorExacto: soloLectura
-          });
-          return deberiaMostrarBoton;
-        })() && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonPrimary, productosSel.length === 0 && { backgroundColor: '#ccc' }]}
-            disabled={productosSel.length === 0}
-            onPress={handleSaveOrden}
-          >
-            <View style={styles.actionButtonContent}>
-              <Ionicons 
-                name={editOrden ? "save" : "create"} 
-                size={20} 
-                color="#fff" 
-                style={styles.actionButtonIcon} 
-              />
-              <Text style={[styles.actionButtonText, { textAlign: 'center' }]}> 
-                {editOrden ? `Actualizar (${productosSel.length})` : `Crear (${productosSel.length})`}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>
+            ) : undefined}
+          />
+      </>
     );
   };
 
   // Función para limpiar estados de modales
   const limpiarEstadosModales = () => {
     setShowActionsModal(false);
-    setShowEstadoModal(false);
     setShowUnidadModal(false);
     setShowAddProductoModal(false);
     setShowTestModal(false);
-    setOrdenEstadoEdit(null);
     setProductoUnidadEdit(null);
     setBusquedaProducto('');
   };
 
-  // Función para manejar el cierre de modales
-  const handleCloseModal = (modalType: 'actions' | 'estado' | 'unidad' | 'addProducto') => {
+  const handleCloseModal = (modalType: 'actions' | 'unidad' | 'addProducto') => {
     switch (modalType) {
       case 'actions':
         setShowActionsModal(false);
-        break;
-      case 'estado':
-        setShowEstadoModal(false);
-        setOrdenEstadoEdit(null);
         break;
       case 'unidad':
         setShowUnidadModal(false);
@@ -2161,49 +1844,34 @@ export default function OrdenesScreen() {
                       lastTap.id === producto.id && 
                       (now - lastTap.timestamp) < DOUBLE_TAP_DELAY;
     
-    console.log('🔍 Tap en modal:', { 
-      productId: producto.id,
-      nombre: producto.nombre,
-      isSelected,
-      isDoubleTap,
-      lastTap: lastTap,
-      timeDiff: lastTap ? now - lastTap.timestamp : null,
-      procesando: productoCalculando === producto.id
-    });
-
     // Si está siendo procesado, ignorar
     if (productoCalculando === producto.id) {
-      console.log('⚠️ Tap ignorado - producto procesándose');
       return;
     }
 
     if (isSelected) {
       if (isDoubleTap) {
         // DOBLE TAP: Desmarcar producto
-        console.log('🔄 DOBLE TAP en modal - Desmarcando producto:', producto.nombre);
-        setUpdateAction('desmarcando');
-        setIsUpdating(true);
         setProductoCalculando(producto.id);
         lastTapRef.current = null;
         
         // Desmarcar inmediatamente
         setProductosSel(productosSel.filter(p => p.id !== producto.id));
         
+        // Si es un producto temporal, eliminarlo de la lista de productos
+        if (producto.id.startsWith('temp_')) {
+          setProductos(prev => prev.filter(p => p.id !== producto.id));
+        }
+        
         setTimeout(() => {
           setProductoCalculando(null);
-          setIsUpdating(false);
-          console.log('✅ Producto desmarcado en modal:', producto.nombre);
         }, 500);
       } else {
         // PRIMER TAP en producto seleccionado: Registrar para posible doble tap
-        console.log('👆 Primer tap en producto seleccionado en modal - registrando para doble tap');
         lastTapRef.current = { id: producto.id, timestamp: now };
       }
     } else {
       // TAP en producto NO seleccionado: Agregar
-      console.log('➕ Agregando producto en modal:', producto.nombre);
-      setUpdateAction('marcando');
-      setIsUpdating(true);
       setProductoCalculando(producto.id);
       
       // Agregar inmediatamente
@@ -2216,8 +1884,6 @@ export default function OrdenesScreen() {
       
       setTimeout(() => {
         setProductoCalculando(null);
-        setIsUpdating(false);
-        console.log('✅ Producto agregado en modal:', producto.nombre);
       }, 500);
     }
   };
@@ -2300,171 +1966,25 @@ export default function OrdenesScreen() {
           activeOpacity={0.7}
         >
           <View style={{ flex: 1 }}>
-            <Text style={[styles.productoNombreModal, seleccionado && { color: '#fff' }]}>{item.nombre}</Text>
+            <Text style={[styles.productoNombreModal, seleccionado && { color: '#fff' }]}>{(item as any).nombre ?? (item as any).name ?? 'Producto'}</Text>
             <Text style={[styles.productoProveedorModal, seleccionado && { color: '#fff' }]}>
               {proveedores.find(p => p.id === item.proveedorId)?.nombre}
             </Text>
           </View>
-          {productoCalculando === item.id ? (
-            <ActivityIndicator size="small" color="#D7263D" />
-          ) : (
-            <Ionicons 
-              name="add-circle-outline" 
-              size={22} 
-              color={seleccionado ? '#fff' : '#D7263D'} 
-            />
-          )}
+          <Ionicons 
+            name="add-circle-outline" 
+            size={22} 
+            color={seleccionado ? '#fff' : '#D7263D'} 
+          />
         </TouchableOpacity>
       </Swipeable>
     );
   };
 
-  useEffect(() => {
-    // Utilidad para saber si una orden es de hoy
-    function esDeHoy(fechaStr: string): boolean {
-      if (!fechaStr) return false;
-      const hoy = new Date();
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      const hoyStr = `${pad(hoy.getDate())}-${pad(hoy.getMonth() + 1)}-${hoy.getFullYear()}`;
-      // Soporta dd-mm-yyyy y yyyy-mm-dd
-      if (/^\d{2}-\d{2}-\d{4}/.test(fechaStr)) {
-        return fechaStr.startsWith(hoyStr);
-      } else if (/^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-        const [y, m, d] = fechaStr.split(/[-T ]/);
-        return `${d}-${m}-${y}` === hoyStr;
-      }
-      return false;
-    }
 
-    // Verifica si hay órdenes PENDIENTE para hoy
-    const hayPendientes = ordenes.some(o => o.estado === 'PENDIENTE' && esDeHoy(o.fecha));
-    
-    // Debug: Mostrar información sobre órdenes pendientes
-    const ordenesPendientesHoy = ordenes.filter(o => o.estado === 'PENDIENTE' && esDeHoy(o.fecha));
-    console.log('🔍 Debug notificaciones:');
-    console.log(`📊 Total órdenes: ${ordenes.length}`);
-    console.log(`⏳ Órdenes pendientes hoy: ${ordenesPendientesHoy.length}`);
-    console.log(`📋 Órdenes pendientes:`, ordenesPendientesHoy.map(o => ({ id: o.id, nombre: o.nombre, fecha: o.fecha, estado: o.estado })));
-    console.log(`🔔 Hay pendientes: ${hayPendientes}`);
-
-    async function programarNotificacionesOrdenesPendientes() {
-      try {
-        // Cancela notificaciones previas de órdenes
-        // Notificaciones eliminadas
-        const notificacionesProgramadas: any[] = [];
-        const notificacionesOrdenes = notificacionesProgramadas.filter(n => 
-          n.content.data?.type === 'orden_pendiente_programada' || 
-          n.content.data?.type === 'orden_pendiente_manana'
-        );
-        
-        for (const notif of notificacionesOrdenes) {
-          // Notificación cancelada
-          // await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-        }
-        
-        console.log(`🧹 ${notificacionesOrdenes.length} notificaciones de órdenes anteriores canceladas`);
-        
-        if (!hayPendientes) {
-          console.log('📱 No hay órdenes pendientes, no se programarán notificaciones');
-          return;
-        }
-
-        console.log('📱 Programando notificaciones cada 30 minutos para órdenes pendientes...');
-        
-        const now = new Date();
-        const hoy = now.toISOString().slice(0, 10); // yyyy-mm-dd
-        
-        // Determinar el mensaje de la notificación
-        let tituloNotificacion = '';
-        let cuerpoNotificacion = '';
-        
-        if (ordenesPendientesHoy.length === 1) {
-          // Si hay solo una orden pendiente, mostrar el proveedor
-          const ordenPendiente = ordenesPendientesHoy[0];
-          const proveedor = proveedores.find(p => p.id === ordenPendiente.proveedorId);
-          const nombreProveedor = proveedor?.nombre || 'Proveedor desconocido';
-          
-          tituloNotificacion = '¡Tienes una orden pendiente!';
-          cuerpoNotificacion = `Orden pendiente de: ${nombreProveedor}`;
-        } else {
-          // Si hay múltiples órdenes, mostrar la cantidad
-          tituloNotificacion = '¡Tienes órdenes pendientes!';
-          cuerpoNotificacion = `${ordenesPendientesHoy.length} órdenes pendientes de hoy`;
-        }
-        
-        // Programar notificaciones cada 4 horas de 8:00 AM a 8:00 PM (menos frecuente)
-        for (let hora = 8; hora <= 20; hora += 4) {
-          const fecha = new Date(`${hoy}T${hora.toString().padStart(2, '0')}:00:00`);
-          
-          // Solo programar si la fecha es futura
-          if (fecha > now) {
-            // Notificación eliminada
-          }
-        }
-        
-        console.log('✅ Notificaciones programadas exitosamente');
-      } catch (error) {
-        console.error('❌ Error programando notificaciones:', error);
-      }
-    }
-
-    programarNotificacionesOrdenesPendientes();
-  }, [ordenes]);
-
-  // useEffect para configurar notificaciones en tiempo real
-  useEffect(() => {
-    if (!userData) return;
-
-    console.log('🔔 Configurando notificaciones en tiempo real para órdenes...');
-
-    // Función de notificaciones eliminada
-
-    // Función de notificaciones eliminada
-
-    // Configuración de notificaciones eliminada
-
-    // Limpieza de notificaciones eliminada
-  }, [userData]);
 
   return (
-    <>
-      {/* Indicador de progreso global */}
-      {isUpdating && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-        }}>
-          <View style={{
-            backgroundColor: '#fff',
-            borderRadius: 12,
-            padding: 20,
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-            elevation: 5,
-          }}>
-            <ActivityIndicator size="large" color="#D7263D" />
-            <Text style={{
-              marginTop: 12,
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#333',
-            }}>
-{updateAction === 'marcando' ? 'Marcando Producto...' : 'Desmarcando Producto...'}
-            </Text>
-          </View>
-        </View>
-      )}
-
+    <View style={{ flex: 1 }}>
       {/* Modal de prueba completamente aislado */}
         <Modal
         visible={showTestModal}
@@ -2482,60 +2002,19 @@ export default function OrdenesScreen() {
         </View>
       </Modal>
       
-      {/* Indicador de creación de órdenes de producción */}
-      {creandoOrdenesProduccion && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9998,
-        }}>
-          <View style={{
-            backgroundColor: '#fff',
-            borderRadius: 12,
-            padding: 20,
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-            elevation: 5,
-          }}>
-            <ActivityIndicator size="large" color="#D7263D" />
-            <Text style={{
-              marginTop: 12,
-              fontSize: 16,
-              fontWeight: 'bold',
-              color: '#333',
-            }}>
-              Creando órdenes de producción...
-            </Text>
-            <Text style={{
-              marginTop: 8,
-              fontSize: 14,
-              color: '#666',
-              textAlign: 'center',
-            }}>
-              Generando órdenes automáticas para productores
-            </Text>
-          </View>
-        </View>
-      )}
-      
-      <View style={styles.safeArea}>
+      <View style={[styles.safeArea, { minHeight: 0 }]}>
         {wizardVisible ? (
-          <View style={styles.wizardContainer}>
+          <View style={[styles.wizardContainer, { minHeight: 0 }]}>
             {renderWizard()}
             {renderFooter()}
           </View>
         ) : (
           <>
-            <Header title={`Órdenes (${ordenesFiltradas.length})`} onAdd={() => openWizard()} />
+            <AppHeader 
+              title={`Órdenes (${ordenesFiltradas.length})`} 
+              showBackButton={false}
+              actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
+            />
             <View style={styles.container}>
               {/* Filtros como segmented control */}
               <View style={styles.segmentedContainer}>
@@ -2543,7 +2022,7 @@ export default function OrdenesScreen() {
                   { key: 'ultimas', label: 'Últimas' },
                   { key: 'hoy', label: 'Hoy' },
                   // Solo mostrar filtro de proveedor si el usuario es ADMIN
-                  ...(userData?.role === 'ADMIN' ? [{ key: 'proveedor', label: 'Proveedor' }] : []),
+                  ...(isAdmin(userData) ? [{ key: 'proveedor', label: 'Proveedor' }] : []),
                   { key: 'todas', label: 'Todas' },
                 ].map(f => (
                 <TouchableOpacity
@@ -2551,7 +2030,7 @@ export default function OrdenesScreen() {
                     style={[styles.segmentedBtn, filtro === f.key && styles.segmentedBtnActive,
                       f.key === 'ultimas' && styles.segmentedBtnLeft,
                       f.key === 'todas' && styles.segmentedBtnRight]}
-                    onPress={() => setFiltro(f.key as any)}
+                    onPress={() => handleCambioFiltro(f.key as any)}
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.segmentedBtnText, filtro === f.key && styles.segmentedBtnTextActive]}>{f.label}</Text>
@@ -2582,7 +2061,7 @@ export default function OrdenesScreen() {
                   <View style={styles.dropdownPickerWrapper}>
                     <Picker
                       selectedValue={proveedorFiltro}
-                      onValueChange={setProveedorFiltro}
+                      onValueChange={(value) => handleCambioProveedor(value)}
                       style={styles.dropdownPicker}
                       mode={Platform.OS === 'ios' ? 'dropdown' : 'dialog'}
                     >
@@ -2595,22 +2074,67 @@ export default function OrdenesScreen() {
                 </View>
               )}
               {loading ? (
-                <ActivityIndicator size="large" color="#D7263D" style={{ marginTop: 40 }} />
+                <View style={{ marginTop: 40 }}><Text style={styles.emptyText}>Cargando...</Text></View>
               ) : ordenesFiltradas.length === 0 ? (
                 <Text style={styles.emptyText}>No hay órdenes para mostrar.</Text>
               ) : (
-                <FlatList
-                  data={ordenesFiltradas}
-                  keyExtractor={item => item.id}
-                  renderItem={renderOrden}
-                  contentContainerStyle={{ paddingBottom: 80 }}
-                />
+                <>
+                  <FlatList
+                    data={ordenesParaLista}
+                    keyExtractor={keyExtractorOrdenes}
+                    renderItem={renderOrden}
+                    contentContainerStyle={{ paddingBottom: hayMasOrdenes ? 60 : 100 }}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={8}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                  />
+                  {hayMasOrdenes && (
+                    <View style={{ minHeight: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                      <TouchableOpacity
+                        onPress={() => setLimiteMostradas(prev => Math.min(prev + MAX_ORDENES_VISIBLES, ordenesFiltradas.length))}
+                        style={{ paddingVertical: 4, paddingHorizontal: 8 }}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={{ color: '#666', fontSize: 13, textDecorationLine: 'underline' }}>
+                          Mostrar más{cantidadMas > 0 ? ` (${cantidadMas} más)` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
                 )}
               </View>
+            {/* Botón flotante nueva orden (oculto si no hay proveedores para este usuario) */}
+            {mostrarBotonNuevaOrden && (
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                bottom: 20,
+                right: 20,
+                backgroundColor: '#D7263D',
+                borderRadius: 30,
+                width: 60,
+                height: 60,
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+                zIndex: 1000
+              }}
+              onPress={openWizard}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
+            )}
             </>
           )}
 
-        {/* Overlay absoluto para acciones */}
+        {/* Overlay absoluto para acciones (abierto desde ... del header) */}
         {showActionsModal && (
           <View style={{
             position: 'absolute',
@@ -2635,8 +2159,8 @@ export default function OrdenesScreen() {
               shadowRadius: 8,
               elevation: 5
             }}>
-              {(!proveedorSel || !editOrden) ? (
-                <Text style={{ textAlign: 'center', color: '#888' }}>Cargando...</Text>
+              {!proveedorSel ? (
+                <Text style={{ textAlign: 'center', color: '#888' }}>Selecciona un contacto para ver opciones.</Text>
               ) : (
                 <>
                   <View style={{ alignItems: 'center', marginBottom: 25 }}>
@@ -2644,7 +2168,26 @@ export default function OrdenesScreen() {
                     <Text style={{ fontSize: 18, fontWeight: '600', color: '#333' }}>Acciones de la Orden</Text>
                   </View>
 
-                  {/* Sección WhatsApp mejorada */}
+                  {/* Cerrar wizard */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#f0f0f0',
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 12
+                    }}
+                    onPress={() => {
+                      setShowActionsModal(false);
+                      closeWizard();
+                    }}
+                  >
+                    <Ionicons name="close-circle-outline" size={26} color="#666" style={{ marginRight: 12 }} />
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#333' }}>Cerrar sin guardar</Text>
+                  </TouchableOpacity>
+
+                  {/* Sección WhatsApp */}
                   <>
                     {editingCelular ? (
                       /* Input inline para editar celular */
@@ -2792,53 +2335,27 @@ export default function OrdenesScreen() {
                           if (!responsable) return;
                           
                           setShowActionsModal(false);
-                          
                           try {
-                            // Construir mensaje mejorado para WhatsApp
-                            const msg = buildWhatsappMessage(editOrden!, proveedorSel, productos, usuario);
+                            showLoading();
+                            const ordenParaMsg = editOrden ?? {
+                              fecha: fechaOrden || obtenerFechaActual(),
+                              productos: productosSel.map(p => ({ id: p.id, productoId: p.id, cantidad: p.cantidad, unidad: p.unidad }))
+                            };
+                            const msg = buildWhatsappMessage(ordenParaMsg as Orden, proveedorSel, productos, usuario);
                             const phone = proveedorSel.celular.toString().replace(/[^\d]/g, '');
-                            
-                            // Validar que el número tenga el formato correcto
                             if (phone.length < 8) {
+                              hideLoading();
                               Alert.alert('Error', 'El número de celular debe tener al menos 8 dígitos');
                               return;
                             }
-                            
                             const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
                             await Linking.openURL(url);
-                            
-                            // Log del evento
-                            await logEvento({ 
-                              tipoEvento: 'ENVIO_WHATSAPP', 
-                              responsable, 
-                              idAfectado: editOrden!.id, 
-                              datosJSON: { 
-                                mensaje: msg, 
-                                proveedor: proveedorSel, 
-                                productos: productos, 
-                                usuario,
-                                celular: phone 
-                              }, 
-                            });
-                            
-                            // Actualizar estado de la orden
-                            if (editOrden!.estado !== 'ENVIADA / IMPRESA') {
-                              const nuevaOrden = { ...editOrden!, estado: 'ENVIADA / IMPRESA' };
-                              await updateOrden(editOrden!.id, nuevaOrden);
-                              // Actualizar la orden en la lista local
-                              setOrdenes(prevOrdenes => 
-                                prevOrdenes.map(orden => 
-                                  orden.id === editOrden!.id 
-                                    ? { ...orden, estado: 'ENVIADA / IMPRESA' }
-                                    : orden
-                                )
-                              );
-                            }
-                            
                             Alert.alert('Éxito', 'Orden enviada por WhatsApp correctamente');
                           } catch (error) {
                             console.error('Error al enviar WhatsApp:', error);
                             Alert.alert('Error', 'No se pudo abrir WhatsApp. Verifica que esté instalado.');
+                          } finally {
+                            hideLoading();
                           }
                         }}
                         onLongPress={() => {
@@ -2917,17 +2434,23 @@ export default function OrdenesScreen() {
                       const responsable = await getResponsableOrAlert();
                       if (!responsable) return;
                       setShowActionsModal(false);
-                      const msg = buildPrintReport(editOrden!, proveedorSel!, productos, usuario);
+                      const ordenParaReport = editOrden ?? {
+                        fecha: fechaOrden || obtenerFechaActual(),
+                        productos: productosSel.map(p => ({ id: p.id, productoId: p.id, cantidad: p.cantidad, unidad: p.unidad }))
+                      };
+                      const msg = buildPrintReport(ordenParaReport as Orden, proveedorSel!, productos, usuario);
                       try {
+                        showLoading();
                         await fetch(PRINT_SERVICE_URL, {
                           method: 'POST',
                           headers: { 'Content-Type': 'text/plain' },
                           body: msg,
                         });
                         Alert.alert('Impresión', 'Enviado a imprimir.');
-                        await logEvento({ tipoEvento: 'IMPRESION_ORDEN', responsable, idAfectado: editOrden!.id, datosJSON: { mensaje: msg, proveedor: proveedorSel, productos, usuario } });
                       } catch (e) {
                         Alert.alert('Error', 'No se pudo enviar a imprimir.');
+                      } finally {
+                        hideLoading();
                       }
                     }}
                   >
@@ -2939,6 +2462,42 @@ export default function OrdenesScreen() {
                       <Text style={{ fontSize: 13, color: '#666' }}>Enviar a la impresora</Text>
                     </View>
                   </TouchableOpacity>
+
+                  {/* Botón Eliminar - solo en edición */}
+                  {editOrden && (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#fff0f0',
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#ffcdd2'
+                      }}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setShowActionsModal(false);
+                        Alert.alert(
+                          'Eliminar orden',
+                          '¿Estás seguro de que deseas eliminar esta orden?',
+                          [
+                            { text: 'No', style: 'cancel' },
+                            { text: 'Eliminar', style: 'destructive', onPress: () => handleDeleteOrden() }
+                          ]
+                        );
+                      }}
+                    >
+                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#D7263D', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Ionicons name="trash-outline" size={24} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#D7263D', marginBottom: 2 }}>Eliminar orden</Text>
+                        <Text style={{ fontSize: 13, color: '#666' }}>Eliminar esta orden permanentemente</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Botón Cancelar SIEMPRE visible */}
                   <TouchableOpacity
@@ -3039,7 +2598,8 @@ export default function OrdenesScreen() {
                       .filter(p => {
                         if (!busquedaProducto) return true;
                         const proveedor = proveedores.find(prov => prov.id === p.proveedorId);
-                        const nombreMatch = containsSearchTerm(p.nombre, busquedaProducto);
+                        const nombreP = (p as any).nombre ?? (p as any).name ?? '';
+                        const nombreMatch = containsSearchTerm(nombreP, busquedaProducto);
                         const proveedorMatch = proveedor ? containsSearchTerm(proveedor.nombre, busquedaProducto) : false;
                         return nombreMatch || proveedorMatch;
                       })
@@ -3049,139 +2609,71 @@ export default function OrdenesScreen() {
                     style={{ marginTop: 12, maxHeight: 400 }}
                     contentContainerStyle={{ paddingBottom: 12 }}
                   />
-                  <TouchableOpacity
-                    style={{ marginTop: 18, padding: 10, backgroundColor: '#666', borderRadius: 5, alignItems: 'center' }}
-                    onPress={() => setShowAddProductoModal(false)}
-                  >
-                    <Text style={{ color: 'white' }}>Cerrar</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 10, backgroundColor: '#D7263D', borderRadius: 5, alignItems: 'center' }}
+                      onPress={() => {
+                        setShowAddProductoModal(false);
+                        setShowCrearProductoTempModal(true);
+                      }}
+                    >
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>Nuevo Producto</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, padding: 10, backgroundColor: '#666', borderRadius: 5, alignItems: 'center' }}
+                      onPress={() => setShowAddProductoModal(false)}
+                    >
+                      <Text style={{ color: 'white', fontWeight: 'bold' }}>Cerrar</Text>
+                    </TouchableOpacity>
+                  </View>
                 </>
               )}
           </View>
           </View>
         )}
 
-        {/* Modal para editar fecha de la orden */}
-        {editandoFecha && (
-          <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 9999
-          }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 18, width: '90%', maxWidth: 400 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 17, color: '#D7263D', marginBottom: 16, textAlign: 'center' }}>
-                Editar Fecha de la Orden
-              </Text>
+        {/* DateTimePicker para editar fecha de la orden */}
+        {editandoFecha && Platform.OS === 'ios' && (
+          <DateTimePicker
+            value={(() => {
+              try {
+                const fechaActual = fechaOrden || obtenerFechaActual();
+                if (fechaActual.includes('-')) {
+                  const [fechaPart, horaPart] = fechaActual.split(' ');
+                  const [dia, mes, año] = fechaPart.split('-');
+                  if (horaPart) {
+                    const [hora, minuto, segundo] = horaPart.split(':');
+                    return new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia), parseInt(hora), parseInt(minuto), parseInt(segundo));
+                  }
+                  return new Date(parseInt(año), parseInt(mes) - 1, parseInt(dia));
+                }
+                return new Date(fechaActual);
+              } catch {
+                return new Date();
+              }
+            })()}
+            mode="datetime"
+            is24Hour={true}
+            display="default"
+            onChange={(event, selectedDate) => {
+              // Cerrar el picker siempre
+              setEditandoFecha(false);
+              setFechaInputText('');
               
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>Fecha (dd/MM/yyyy HH:mm:ss):</Text>
-                <TextInput
-                  style={{ 
-                    borderWidth: 1, 
-                    borderColor: '#ddd', 
-                    borderRadius: 8, 
-                    padding: 12, 
-                    fontSize: 16,
-                    color: '#222',
-                    backgroundColor: '#f9f9f9'
-                  }}
-                  value={fechaInputText}
-                  onChangeText={(text) => {
-                    setFechaInputText(text);
-                    // Validar y convertir el formato dd/MM/yyyy HH:mm:ss a ISO
-                    const regex = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
-                    const match = text.match(regex);
-                    if (match) {
-                      const [, dia, mes, año, hora, minuto, segundo] = match;
-                      const fecha = new Date(
-                        parseInt(año),
-                        parseInt(mes) - 1,
-                        parseInt(dia),
-                        parseInt(hora),
-                        parseInt(minuto),
-                        parseInt(segundo)
-                      );
-                      if (!isNaN(fecha.getTime())) {
-                        setFechaOrden(fecha.toISOString());
-                      }
-                    }
-                  }}
-                  placeholder="dd/MM/yyyy HH:mm:ss"
-                  placeholderTextColor="#aaa"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={{ marginBottom: 20 }}>
-                <TouchableOpacity
-                  style={{ 
-                    width: '100%', 
-                    padding: 12, 
-                    backgroundColor: '#D7263D', 
-                    borderRadius: 8, 
-                    alignItems: 'center'
-                  }}
-                  onPress={() => {
-                    const nuevaFecha = obtenerFechaActual();
-                    setFechaOrden(nuevaFecha);
-                    setFechaInputText(formatearFecha(nuevaFecha));
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '500', fontSize: 16 }}>Fecha Ahora</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <TouchableOpacity
-                  style={{ 
-                    flex: 1, 
-                    padding: 12, 
-                    backgroundColor: '#666', 
-                    borderRadius: 8, 
-                    alignItems: 'center',
-                    marginRight: 8
-                  }}
-                  onPress={() => {
-                    setEditandoFecha(false);
-                    setFechaInputText('');
-                    setFechaUpdateTrigger(0);
-                  }}
-                >
-                  <Text style={{ color: 'white' }}>Cancelar</Text>
-                </TouchableOpacity>
+              // Solo actualizar si hay una fecha seleccionada
+              if (selectedDate) {
+                const dia = selectedDate.getDate().toString().padStart(2, '0');
+                const mes = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+                const año = selectedDate.getFullYear();
+                const hora = selectedDate.getHours().toString().padStart(2, '0');
+                const minuto = selectedDate.getMinutes().toString().padStart(2, '0');
+                const segundo = selectedDate.getSeconds().toString().padStart(2, '0');
                 
-                <TouchableOpacity
-                  style={{ 
-                    flex: 1, 
-                    padding: 12, 
-                    backgroundColor: '#D7263D', 
-                    borderRadius: 8, 
-                    alignItems: 'center',
-                    marginLeft: 8
-                  }}
-                  onPress={() => {
-                    // Procesar la fecha del input antes de cerrar
-                    const regex = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
-                    const match = fechaInputText.match(regex);
-                    if (match) {
-                      const [, dia, mes, año, hora, minuto, segundo] = match;
-                      // Convertir a formato dd-mm-yyyy HH:mm:ss para la BD
-                      const nuevaFechaTexto = `${dia}-${mes}-${año} ${hora}:${minuto}:${segundo}`;
-                      console.log('Actualizando fecha:', { fechaInputText, nuevaFechaTexto });
-                      setFechaOrden(nuevaFechaTexto);
-                      // Forzar re-render
-                      setTimeout(() => {
-                        setFechaUpdateTrigger(prev => prev + 1);
-                      }, 100);
-                    }
-                    setEditandoFecha(false);
-                    setFechaInputText('');
-                  }}
-                >
-                  <Text style={{ color: 'white' }}>Aceptar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+                const nuevaFechaTexto = `${dia}-${mes}-${año} ${hora}:${minuto}:${segundo}`;
+                setFechaOrden(nuevaFechaTexto);
+              }
+            }}
+          />
         )}
 
         {/* Toast temporal al final de la pantalla */}
@@ -3192,46 +2684,6 @@ export default function OrdenesScreen() {
         )}
 
         {/* Overlay absoluto para cambiar estado de la orden */}
-        {showEstadoModal && (
-          <View style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.18)', justifyContent: 'center', alignItems: 'center', zIndex: 9999
-          }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 18, width: '85%', maxHeight: '60%' }}>
-              {!ordenEstadoEdit ? (
-                <Text style={{ textAlign: 'center', color: '#888' }}>Cargando...</Text>
-              ) : (
-                <>
-                  <Text style={{ fontWeight: 'bold', fontSize: 17, color: '#D7263D', marginBottom: 12 }}>Cambiar estado de la orden</Text>
-                  <ScrollView style={{ maxHeight: 200 }}>
-                    {ESTADOS_ORDEN_ARRAY.map(estado => {
-                      const estadoStyle = getEstadoStyle(estado) || {};
-                      const colorTexto = (estadoStyle && (estadoStyle as any).backgroundColor) ? (estadoStyle as any).backgroundColor : '#222';
-                      return (
-                        <TouchableOpacity
-                          key={estado}
-                          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee', gap: 10 }}
-                          onPress={() => handleChangeEstado(estado)}
-                        >
-                          <View style={{ marginRight: 6 }}>{getEstadoIcon(estado)}</View>
-                          <Text style={{ color: colorTexto, fontSize: 16, fontWeight: 'bold', flex: 1 }}>
-                            {estado}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={{ marginTop: 18, padding: 10, backgroundColor: '#666', borderRadius: 5, alignItems: 'center' }}
-                    onPress={() => { setShowEstadoModal(false); setOrdenEstadoEdit(null); }}
-                  >
-                    <Text style={{ color: 'white' }}>Cancelar</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </View>
-        )}
       </View>
       {/* Overlay personalizado para historial de producto */}
       {showHistorialModal && productoHistorial && (
@@ -3347,45 +2799,178 @@ export default function OrdenesScreen() {
           </View>
         </View>
       )}
-      {procesandoOrden && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
-          <ActivityIndicator size="large" color="#D7263D" />
-          <Text style={{ marginTop: 12, color: '#D7263D', fontWeight: 'bold', fontSize: 16 }}>Actualizando Posición</Text>
+      {/* Modal para agregar producto temporal */}
+      <Modal
+        visible={showCrearProductoTempModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCrearProductoTempModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 24, width: '85%', maxWidth: 400 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#222', marginBottom: 16, textAlign: 'center' }}>
+              Agregar Producto Temporal
+            </Text>
+            
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>Nombre del Producto:</Text>
+              <TextInput
+                style={{ 
+                  borderWidth: 1, 
+                  borderColor: '#ddd', 
+                  borderRadius: 8, 
+                  padding: 12, 
+                  fontSize: 16,
+                  color: '#222',
+                  backgroundColor: '#f9f9f9',
+                  textTransform: 'uppercase'
+                }}
+                value={nombreProductoTemp}
+                onChangeText={setNombreProductoTemp}
+                placeholder="Ej: PRODUCTO ESPECIAL"
+                placeholderTextColor="#aaa"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>Precio:</Text>
+              <TextInput
+                style={{ 
+                  borderWidth: 1, 
+                  borderColor: '#ddd', 
+                  borderRadius: 8, 
+                  padding: 12, 
+                  fontSize: 16,
+                  color: '#222',
+                  backgroundColor: '#f9f9f9'
+                }}
+                value={precioProductoTemp}
+                onChangeText={setPrecioProductoTemp}
+                placeholder="0.00"
+                placeholderTextColor="#aaa"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>Unidad:</Text>
+              <Picker
+                selectedValue={unidadProductoTemp}
+                onValueChange={(itemValue) => setUnidadProductoTemp(itemValue)}
+                style={{ backgroundColor: '#f9f9f9', borderRadius: 8 }}
+              >
+                {UNIDADES.map((unidad) => (
+                  <Picker.Item key={unidad} label={unidad} value={unidad} />
+                ))}
+              </Picker>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={{ 
+                  flex: 1, 
+                  padding: 12, 
+                  backgroundColor: '#ccc', 
+                  borderRadius: 8, 
+                  alignItems: 'center'
+                }}
+                onPress={() => {
+                  setShowCrearProductoTempModal(false);
+                  setNombreProductoTemp('');
+                  setPrecioProductoTemp('');
+                  setUnidadProductoTemp('UNIDAD');
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ 
+                  flex: 1, 
+                  padding: 12, 
+                  backgroundColor: '#D7263D', 
+                  borderRadius: 8, 
+                  alignItems: 'center'
+                }}
+                onPress={() => {
+                  if (nombreProductoTemp.trim() && precioProductoTemp.trim()) {
+                    // Crear un producto temporal con ID único
+                    const productoTempId = `temp_${Date.now()}`;
+                    const productoTemp: Producto = {
+                      id: productoTempId,
+                      nombre: nombreProductoTemp.trim(),
+                      proveedorId: proveedorSel?.id || '',
+                      unidad: unidadProductoTemp,
+                      precio: parseFloat(precioProductoTemp) || 0,
+                      archivado: false,
+                      temporal: true // Marcar como temporal
+                    };
+                    
+                    // Agregar a la lista de productos temporalmente
+                    setProductos([...productos, productoTemp]);
+                    
+                    // Agregar automáticamente a los productos seleccionados con cantidad 1
+                    setProductosSel([...productosSel, {
+                      id: productoTempId,
+                      cantidad: '1',
+                      unidad: unidadProductoTemp
+                    }]);
+                    
+                    // Limpiar y cerrar
+                    setShowCrearProductoTempModal(false);
+                    setNombreProductoTemp('');
+                    setPrecioProductoTemp('');
+                    setUnidadProductoTemp('UNIDAD');
+                  } else {
+                    Alert.alert('Error', 'Por favor ingresa nombre y precio');
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Agregar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      )}
-    </>
+      </Modal>
+      
+      {/* Modal de confirmación de cancelación */}
+      <Modal
+        visible={showCancelModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 24, width: '85%', maxWidth: 400 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#222', marginBottom: 8, textAlign: 'center' }}>
+              Cancelar
+            </Text>
+            <Text style={{ fontSize: 15, color: '#666', marginBottom: 24, textAlign: 'center' }}>
+              ¿Estás seguro de que deseas cancelar? Se perderán todos los cambios.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, backgroundColor: '#ccc', borderRadius: 8, alignItems: 'center' }}
+                onPress={() => setShowCancelModal(false)}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, backgroundColor: '#D7263D', borderRadius: 8, alignItems: 'center' }}
+                onPress={() => {
+                  setShowCancelModal(false);
+                  closeWizard();
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Sí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
     );
   }
-
-function getEstadoStyle(estado: string) {
-  switch (estado) {
-    case ESTADOS_ORDEN.PENDIENTE:
-      return styles.estado_pendiente;
-    case ESTADOS_ORDEN.COMPLETADA:
-      return styles.estado_completada;
-    case ESTADOS_ORDEN.RECHAZADA:
-      return styles.estado_rechazada;
-    case ESTADOS_ORDEN.ENVIADA_IMPRESA:
-      return styles.estado_enviada_impresa;
-    default:
-      return {};
-  }
-}
-
-function getEstadoIcon(estado: string) {
-  switch (estado) {
-    case ESTADOS_ORDEN.PENDIENTE:
-      return <Ionicons name="time" size={18} color="#FFA500" style={{ marginRight: 6 }} />;
-    case ESTADOS_ORDEN.COMPLETADA:
-      return <Ionicons name="checkmark-circle" size={18} color="#34C759" style={{ marginRight: 6 }} />;
-    case ESTADOS_ORDEN.RECHAZADA:
-      return <Ionicons name="close-circle" size={18} color="#FF3B30" style={{ marginRight: 6 }} />;
-    case ESTADOS_ORDEN.ENVIADA_IMPRESA:
-      return <Ionicons name="print" size={18} color="#007AFF" style={{ marginRight: 6 }} />;
-    default:
-      return null;
-  }
-}
 
 // Función robusta para parsear fechas en formatos dd-mm-yyyy y yyyy-mm-dd
 function parseFechaHistorial(fecha: string) {
@@ -3434,14 +3019,14 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#f8f8f8',
     borderRadius: 6,
-    padding: 10,
-    marginBottom: 8,
+    padding: 8,
+    marginBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
-    minHeight: 80,
+    minHeight: 0,
     borderWidth: 1,
     borderColor: '#e8e8e8',
   },
@@ -3449,18 +3034,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   proveedor: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#222',
   },
   cardPropText: {
     color: '#888',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'normal',
-    marginBottom: 2,
   },
   estadoBadge: {
     paddingHorizontal: 10,
@@ -3560,6 +3144,7 @@ const styles = StyleSheet.create({
   },
   wizardContainer: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: '#fff',
     borderRadius: 0,
     padding: 0,
@@ -3676,21 +3261,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.1,
   },
-  estado_pendiente: {
-    backgroundColor: '#FFA500',
-  },
-  estado_completada: {
-    backgroundColor: '#34C759',
-  },
-  estado_rechazada: {
-    backgroundColor: '#FF3B30',
-  },
-  estado_enviada: {
-    backgroundColor: '#007AFF',
-  },
-  estado_enviada_impresa: {
-    backgroundColor: '#007AFF',
-  },
   cancelBtn: {
     backgroundColor: 'transparent',
     borderRadius: 10,
@@ -3750,40 +3320,76 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 0,
     minWidth: 40,
-    padding: 8,
-    borderRadius: 10,
+    padding: 4,
+    borderRadius: 6,
     backgroundColor: 'transparent',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
   },
   actionButtonPrimary: {
     backgroundColor: '#D7263D',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 120,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   actionButtonSecondary: {
     flex: 0,
     minWidth: 40,
     backgroundColor: 'transparent',
   },
+  floatingMenuButton: {
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    minWidth: 56,
+    borderWidth: 2,
+    borderColor: '#D7263D',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
-    flexShrink: 1,
-    flexWrap: 'wrap',
+    flexShrink: 0,
+    flex: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    numberOfLines: 1,
+    width: 'auto',
+    maxWidth: 'none',
+    lineHeight: 16,
   },
   actionButtonIcon: {
-    marginRight: 10,
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
   },
   actionButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexWrap: 'wrap',
-    minHeight: 40,
+    flexWrap: 'nowrap',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
+    gap: 4,
   },
   modalOverlay: {
     flex: 1,

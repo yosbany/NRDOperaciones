@@ -1,5 +1,5 @@
-import OrdenesList from '../../components/web/OrdenesList';
+import OrdenesScreen from '../(tabs)/ordenes';
 
 export default function WebOrdenes() {
-  return <OrdenesList />;
+  return <OrdenesScreen />;
 }

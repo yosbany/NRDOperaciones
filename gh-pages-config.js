@@ -21,8 +21,6 @@ module.exports = {
       '/web/ordenes': { page: '/web/ordenes' },
       '/web/productos': { page: '/web/productos' },
       '/web/contactos': { page: '/web/contactos' },
-      '/web/costos': { page: '/web/costos' },
-      '/web/tareas': { page: '/web/tareas' },
     };
   },
   

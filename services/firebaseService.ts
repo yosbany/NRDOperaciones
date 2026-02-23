@@ -3,10 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
     getAuth,
+    getReactNativePersistence,
+    initializeAuth,
     signInWithEmailAndPassword,
     signOut
 } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
+import { Platform } from 'react-native';
 import { APP_CONFIG } from '../constants/Config';
 
 // Configuración de Firebase
@@ -15,9 +18,38 @@ const firebaseConfig = APP_CONFIG.FIREBASE_CONFIG;
 // Inicializar Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Exportar servicios
-export const auth = getAuth(app);
+// Inicializar Firebase Auth con persistencia apropiada para cada plataforma
+let auth;
+if (Platform.OS === 'web') {
+  // Para web, usar getAuth con persistencia por defecto
+  auth = getAuth(app);
+} else {
+  // Para React Native, usar initializeAuth con AsyncStorage
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  } catch (error) {
+    // Si ya existe una instancia de auth, usar getAuth
+    auth = getAuth(app);
+  }
+}
+
+export { auth };
 export const database = getDatabase(app);
+
+/** Dominio de correo para administradores: usuario@nrd.adm.com = admin */
+export const ADMIN_EMAIL_DOMAIN = '@nrd.adm.com';
+
+/** true si el usuario es admin por dominio de email */
+export function isAdmin(user: User | null): boolean {
+  return (user?.email ?? '').toLowerCase().endsWith(ADMIN_EMAIL_DOMAIN);
+}
+
+/** Parte antes del @ del email (ej: marcelo@nrd.com → "marcelo"). Usado para productores sin .adm.com */
+export function getEmailPrefix(user: User | null): string {
+  return (user?.email ?? '').split('@')[0].toLowerCase().trim();
+}
 
 // Modelo User simple
 export interface User {
@@ -37,23 +69,19 @@ export interface User {
 // Función de login con Firebase Auth
 export async function loginWithFirebase(email: string, password: string): Promise<User> {
   try {
-    console.log('🔐 Iniciando login con Firebase Auth...');
-    
     // Autenticar con Firebase Auth
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
     
-    console.log('✅ Usuario autenticado en Firebase Auth:', firebaseUser.email);
-    
-    // Obtener datos del usuario desde la base de datos
-    const userData = await getUserByUid(firebaseUser.uid);
-    
+    // Si está autenticado con Firebase Auth, permitir entrada (con o sin usuario en BD)
+    let userData = await getUserByUid(firebaseUser.uid);
     if (!userData) {
-      throw new Error('Usuario no encontrado en la base de datos');
+      userData = await createUserInDatabase(
+        firebaseUser.uid,
+        firebaseUser.email || '',
+        firebaseUser.displayName || undefined
+      );
     }
-    
-    console.log('✅ Datos del usuario obtenidos:', userData.email, 'Rol:', userData.role);
-    
     return userData;
   } catch (error: any) {
     console.error('❌ Error en login:', error);
@@ -64,12 +92,7 @@ export async function loginWithFirebase(email: string, password: string): Promis
 // Función de logout
 export async function logout(): Promise<void> {
   try {
-    console.log('🔐 Iniciando logout...');
-    
-    // Cerrar sesión en Firebase Auth
     await signOut(auth);
-    
-    console.log('✅ Logout completado');
   } catch (error: any) {
     console.error('❌ Error en logout:', error);
     throw error;
@@ -79,16 +102,14 @@ export async function logout(): Promise<void> {
 // Crear usuario en la base de datos
 export async function createUserInDatabase(uid: string, email: string, displayName?: string): Promise<User> {
   try {
-    console.log('👤 Creando usuario en base de datos:', email);
-    
     const { set, ref } = await import('firebase/database');
     const userRef = ref(database, `users/${uid}`);
     
+    const roleFromEmail = email.toLowerCase().endsWith(ADMIN_EMAIL_DOMAIN) ? 'ADMIN' : 'user';
     const userData = {
       uid: uid,
       email: email,
       displayName: displayName || email.split('@')[0],
-      role: 'user', // Rol por defecto
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -99,13 +120,12 @@ export async function createUserInDatabase(uid: string, email: string, displayNa
       id: uid,
       displayName: userData.displayName,
       email: userData.email,
-      role: userData.role,
+      role: roleFromEmail,
       userId: uid,
       createdAt: userData.createdAt,
       updatedAt: userData.updatedAt
     };
     
-    console.log('✅ Usuario creado en base de datos:', user.email, 'Rol:', user.role);
     return user;
   } catch (error: any) {
     console.error('❌ Error creando usuario en base de datos:', error);
@@ -116,8 +136,6 @@ export async function createUserInDatabase(uid: string, email: string, displayNa
 // Obtener usuario por UID
 export async function getUserByUid(uid: string): Promise<User | null> {
   try {
-    console.log('🔍 Buscando usuario por UID:', uid);
-    
     // Buscar usuario directamente por la clave del nodo
     const { get, ref } = await import('firebase/database');
     const userRef = ref(database, `users/${uid}`);
@@ -125,13 +143,13 @@ export async function getUserByUid(uid: string): Promise<User | null> {
     
     if (snapshot.exists()) {
       const userData = snapshot.val();
-      console.log('🔍 Datos raw de la base de datos:', userData);
       
+      const roleFromEmail = (userData.email || '').toLowerCase().endsWith(ADMIN_EMAIL_DOMAIN) ? 'ADMIN' : 'user';
       const user: User = {
         id: uid,
         displayName: userData.displayName,
         email: userData.email,
-        role: userData.role || 'user', // Asignar rol por defecto si no existe
+        role: roleFromEmail,
         userId: userData.userId || uid,
         contactId: userData.contactId,
         idContacto: userData.idContacto,
@@ -141,11 +159,8 @@ export async function getUserByUid(uid: string): Promise<User | null> {
         updatedAt: userData.updatedAt
       };
       
-      console.log('✅ Usuario encontrado:', user.email, 'Rol:', user.role);
-      console.log('🔍 Usuario completo:', user);
       return user;
     } else {
-      console.log('⚠️ Usuario no encontrado para UID:', uid);
       return null;
     }
   } catch (error: any) {
@@ -161,7 +176,6 @@ export async function getUserByUid(uid: string): Promise<User | null> {
 // Obtener proveedores
 export async function getProveedores(callback: (proveedores: any[]) => void): Promise<void> {
   try {
-    console.log('🔍 Obteniendo proveedores...');
     const { get, ref } = await import('firebase/database');
     const proveedoresRef = ref(database, 'proveedores');
     const snapshot = await get(proveedoresRef);
@@ -172,10 +186,8 @@ export async function getProveedores(callback: (proveedores: any[]) => void): Pr
         id: key,
         ...data[key]
       }));
-      console.log('✅ Proveedores obtenidos:', proveedores.length);
       callback(proveedores);
     } else {
-      console.log('⚠️ No hay proveedores en la base de datos');
       callback([]);
     }
   } catch (error: any) {
@@ -185,31 +197,35 @@ export async function getProveedores(callback: (proveedores: any[]) => void): Pr
 }
 
 // Obtener órdenes por rol de usuario
+// Admin (@nrd.adm.com): todas. Resto: solo órdenes cuyo proveedor.nombre = parte antes del @ (ej: marcelo@nrd.com → órdenes de proveedor "marcelo")
 export async function getOrdenesByUserRole(userData: User, callback: (ordenes: any[]) => void): Promise<void> {
   try {
-    console.log('🔍 Obteniendo órdenes por rol de usuario:', userData.role);
     const { get, ref } = await import('firebase/database');
     const ordenesRef = ref(database, 'ordenes');
     const snapshot = await get(ordenesRef);
     
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      let ordenes = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key]
-      }));
-      
-      // Filtrar por rol si es necesario
-      if (userData.role !== 'ADMIN') {
-        ordenes = ordenes.filter(orden => orden.asignadaA === userData.id);
-      }
-      
-      console.log('✅ Órdenes obtenidas:', ordenes.length);
-      callback(ordenes);
-    } else {
-      console.log('⚠️ No hay órdenes en la base de datos');
+    if (!snapshot.exists()) {
       callback([]);
+      return;
     }
+    const data = snapshot.val();
+    let ordenes = Object.keys(data).map((key: string) => ({
+      id: key,
+      ...data[key]
+    }));
+    if (isAdmin(userData)) {
+      callback(ordenes);
+      return;
+    }
+    getProveedores((proveedores) => {
+      const prefix = getEmailPrefix(userData);
+      ordenes = ordenes.filter((orden: any) => {
+        const prov = proveedores.find((p: any) => p.id === orden.proveedorId);
+        const provNombre = (prov?.nombre ?? '').toLowerCase().trim();
+        return provNombre === prefix;
+      });
+      callback(ordenes);
+    });
   } catch (error: any) {
     console.error('❌ Error obteniendo órdenes:', error);
     callback([]);
@@ -219,21 +235,17 @@ export async function getOrdenesByUserRole(userData: User, callback: (ordenes: a
 // Obtener productos
 export async function getProductos(callback: (productos: any[]) => void): Promise<void> {
   try {
-    console.log('🔍 Obteniendo productos...');
     const { get, ref } = await import('firebase/database');
     const productosRef = ref(database, 'productos');
     const snapshot = await get(productosRef);
-    
     if (snapshot.exists()) {
       const data = snapshot.val();
       const productos = Object.keys(data).map(key => ({
         id: key,
         ...data[key]
       }));
-      console.log('✅ Productos obtenidos:', productos.length);
       callback(productos);
     } else {
-      console.log('⚠️ No hay productos en la base de datos');
       callback([]);
     }
   } catch (error: any) {
@@ -242,92 +254,14 @@ export async function getProductos(callback: (productos: any[]) => void): Promis
   }
 }
 
-// Obtener tareas por rol de usuario
-export async function getTareasByUserRole(userData: User, callback: (tareas: any[]) => void): Promise<void> {
-  try {
-    console.log('🔍 Obteniendo tareas por rol de usuario:', userData.role);
-    const { get, ref } = await import('firebase/database');
-    const tareasRef = ref(database, 'tareas');
-    const snapshot = await get(tareasRef);
-    
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      let tareas = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key]
-      }));
-      
-      // Filtrar por rol si es necesario
-      if (userData.role !== 'ADMIN') {
-        tareas = tareas.filter(tarea => tarea.asignadaA === userData.id);
-      }
-      
-      console.log('✅ Tareas obtenidas:', tareas.length);
-      if (typeof callback === 'function') {
-        callback(tareas);
-      }
-    } else {
-      console.log('⚠️ No hay tareas en la base de datos');
-      if (typeof callback === 'function') {
-        callback([]);
-      }
-    }
-  } catch (error: any) {
-    console.error('❌ Error obteniendo tareas:', error);
-    if (typeof callback === 'function') {
-      callback([]);
-    }
-  }
-}
-
-// Obtener usuarios para asignación
-export async function getUsuariosParaAsignacion(callback: (usuarios: any[]) => void): Promise<void> {
-  try {
-    console.log('🔍 Obteniendo usuarios para asignación...');
-    const { get, ref } = await import('firebase/database');
-    const usersRef = ref(database, 'users');
-    const snapshot = await get(usersRef);
-    
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      const usuarios = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key]
-      }));
-      
-      console.log('✅ Usuarios obtenidos:', usuarios.length);
-      callback(usuarios);
-    } else {
-      console.log('⚠️ No hay usuarios en la base de datos');
-      callback([]);
-    }
-  } catch (error: any) {
-    console.error('❌ Error obteniendo usuarios:', error);
-    callback([]);
-  }
-}
-
 // Función de diagnóstico para usuarios problemáticos
 export async function diagnosticarUsuario(uid: string): Promise<void> {
   try {
-    console.log('🔍 Ejecutando diagnóstico para usuario:', uid);
-    
-    // Verificar si el usuario existe en la base de datos
     const user = await getUserByUid(uid);
-    
     if (user) {
-      console.log('✅ Usuario encontrado en diagnóstico:', {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        displayName: user.displayName
-      });
-    } else {
-      console.log('❌ Usuario no encontrado en diagnóstico para UID:', uid);
+      // Usuario encontrado
     }
-    
     // Aquí se podrían agregar más verificaciones de diagnóstico
-    console.log('✅ Diagnóstico completado para usuario:', uid);
   } catch (error: any) {
     console.error('❌ Error en diagnóstico de usuario:', error);
   }
@@ -335,24 +269,12 @@ export async function diagnosticarUsuario(uid: string): Promise<void> {
 
 // ===== FUNCIONES DE PERMISOS =====
 
-// Verificar si el usuario puede acceder a una pestaña específica
+// Admin: todas las pestañas. Sin @nrd.adm.com: solo Inicio y Órdenes (Contactos y Productos restringidos)
 export function canAccessTab(userData: User, tabName: string): boolean {
-  if (!userData || !userData.role) {
-    return false;
-  }
-  
-  // Los administradores pueden acceder a todas las pestañas
-  if (userData.role === 'ADMIN') {
-    return true;
-  }
-  
-  // Los productores solo pueden acceder a ciertas pestañas
-  if (userData.role === 'PRODUCTOR') {
-    const allowedTabs = ['index', 'ordenes', 'productos'];
-    return allowedTabs.includes(tabName);
-  }
-  
-  return false;
+  if (!userData) return false;
+  if (isAdmin(userData)) return true;
+  const allowedTabs = ['index', 'ordenes'];
+  return allowedTabs.includes(tabName);
 }
 
 // ===== FUNCIONES DE PRODUCTOS =====
@@ -360,7 +282,6 @@ export function canAccessTab(userData: User, tabName: string): boolean {
 // Guardar producto
 export async function saveProducto(productoData: any): Promise<void> {
   try {
-    console.log('💾 Guardando producto:', productoData.nombre);
     const { set, ref } = await import('firebase/database');
     const productosRef = ref(database, `productos/${Date.now()}`);
     
@@ -371,7 +292,6 @@ export async function saveProducto(productoData: any): Promise<void> {
     };
     
     await set(productosRef, producto);
-    console.log('✅ Producto guardado exitosamente');
   } catch (error: any) {
     console.error('❌ Error guardando producto:', error);
     throw error;
@@ -381,7 +301,6 @@ export async function saveProducto(productoData: any): Promise<void> {
 // Actualizar producto
 export async function updateProducto(id: string, updateData: any): Promise<void> {
   try {
-    console.log('🔄 Actualizando producto:', id);
     const { update, ref } = await import('firebase/database');
     const productoRef = ref(database, `productos/${id}`);
     
@@ -391,7 +310,6 @@ export async function updateProducto(id: string, updateData: any): Promise<void>
     };
     
     await update(productoRef, updateDataWithTimestamp);
-    console.log('✅ Producto actualizado exitosamente');
   } catch (error: any) {
     console.error('❌ Error actualizando producto:', error);
     throw error;
@@ -401,124 +319,12 @@ export async function updateProducto(id: string, updateData: any): Promise<void>
 // Eliminar producto
 export async function deleteProducto(id: string): Promise<void> {
   try {
-    console.log('🗑️ Eliminando producto:', id);
     const { remove, ref } = await import('firebase/database');
     const productoRef = ref(database, `productos/${id}`);
     
     await remove(productoRef);
-    console.log('✅ Producto eliminado exitosamente');
   } catch (error: any) {
     console.error('❌ Error eliminando producto:', error);
-    throw error;
-  }
-}
-
-// ===== FUNCIONES DE EVENTOS =====
-
-// Registrar evento
-export async function logEvento(eventoData: any): Promise<void> {
-  try {
-    console.log('📝 Registrando evento:', eventoData.tipoEvento);
-    const { set, ref } = await import('firebase/database');
-    const eventosRef = ref(database, `eventos/${Date.now()}`);
-    
-    const evento = {
-      ...eventoData,
-      timestamp: new Date().toISOString()
-    };
-    
-    await set(eventosRef, evento);
-    console.log('✅ Evento registrado exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error registrando evento:', error);
-    throw error;
-  }
-}
-
-// ===== FUNCIONES DE TAREAS =====
-
-// Guardar tarea
-export async function saveTarea(tareaData: any): Promise<void> {
-  try {
-    console.log('💾 Guardando tarea:', tareaData.titulo);
-    const { set, ref } = await import('firebase/database');
-    const tareasRef = ref(database, `tareas/${Date.now()}`);
-    
-    const tarea = {
-      ...tareaData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    await set(tareasRef, tarea);
-    console.log('✅ Tarea guardada exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error guardando tarea:', error);
-    throw error;
-  }
-}
-
-// Actualizar tarea
-export async function updateTarea(id: string, updateData: any): Promise<void> {
-  try {
-    console.log('🔄 Actualizando tarea:', id);
-    const { update, ref } = await import('firebase/database');
-    const tareaRef = ref(database, `tareas/${id}`);
-    
-    const updateDataWithTimestamp = {
-      ...updateData,
-      updatedAt: new Date().toISOString()
-    };
-    
-    await update(tareaRef, updateDataWithTimestamp);
-    console.log('✅ Tarea actualizada exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error actualizando tarea:', error);
-    throw error;
-  }
-}
-
-// Eliminar tarea
-export async function deleteTarea(id: string): Promise<void> {
-  try {
-    console.log('🗑️ Eliminando tarea:', id);
-    const { remove, ref } = await import('firebase/database');
-    const tareaRef = ref(database, `tareas/${id}`);
-    
-    await remove(tareaRef);
-    console.log('✅ Tarea eliminada exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error eliminando tarea:', error);
-    throw error;
-  }
-}
-
-// Completar tarea
-export async function completarTarea(id: string): Promise<void> {
-  try {
-    console.log('✅ Completando tarea:', id);
-    await updateTarea(id, { 
-      completada: true, 
-      fechaCompletada: new Date().toISOString() 
-    });
-    console.log('✅ Tarea completada exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error completando tarea:', error);
-    throw error;
-  }
-}
-
-// Reactivar tarea
-export async function reactivarTarea(id: string): Promise<void> {
-  try {
-    console.log('🔄 Reactivando tarea:', id);
-    await updateTarea(id, { 
-      completada: false, 
-      fechaCompletada: undefined 
-    });
-    console.log('✅ Tarea reactivada exitosamente');
-  } catch (error: any) {
-    console.error('❌ Error reactivando tarea:', error);
     throw error;
   }
 }
@@ -528,21 +334,17 @@ export async function reactivarTarea(id: string): Promise<void> {
 // Obtener todas las órdenes
 export async function getOrdenes(callback: (ordenes: any[]) => void): Promise<void> {
   try {
-    console.log('🔍 Obteniendo todas las órdenes...');
     const { get, ref } = await import('firebase/database');
     const ordenesRef = ref(database, 'ordenes');
     const snapshot = await get(ordenesRef);
-    
     if (snapshot.exists()) {
       const data = snapshot.val();
       const ordenes = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key]
+        ...data[key],
+        id: key
       }));
-      console.log('✅ Órdenes obtenidas:', ordenes.length);
       callback(ordenes);
     } else {
-      console.log('⚠️ No hay órdenes en la base de datos');
       callback([]);
     }
   } catch (error: any) {
@@ -554,7 +356,6 @@ export async function getOrdenes(callback: (ordenes: any[]) => void): Promise<vo
 // Guardar orden
 export async function saveOrden(ordenData: any): Promise<void> {
   try {
-    console.log('💾 Guardando orden:', ordenData.id);
     const { set, ref } = await import('firebase/database');
     const ordenesRef = ref(database, `ordenes/${ordenData.id}`);
     
@@ -565,7 +366,6 @@ export async function saveOrden(ordenData: any): Promise<void> {
     };
     
     await set(ordenesRef, orden);
-    console.log('✅ Orden guardada exitosamente');
   } catch (error: any) {
     console.error('❌ Error guardando orden:', error);
     throw error;
@@ -575,7 +375,6 @@ export async function saveOrden(ordenData: any): Promise<void> {
 // Actualizar orden
 export async function updateOrden(id: string, updateData: any): Promise<void> {
   try {
-    console.log('🔄 Actualizando orden:', id);
     const { update, ref } = await import('firebase/database');
     const ordenRef = ref(database, `ordenes/${id}`);
     
@@ -585,7 +384,6 @@ export async function updateOrden(id: string, updateData: any): Promise<void> {
     };
     
     await update(ordenRef, updateDataWithTimestamp);
-    console.log('✅ Orden actualizada exitosamente');
   } catch (error: any) {
     console.error('❌ Error actualizando orden:', error);
     throw error;
@@ -595,12 +393,10 @@ export async function updateOrden(id: string, updateData: any): Promise<void> {
 // Eliminar orden
 export async function deleteOrden(id: string): Promise<void> {
   try {
-    console.log('🗑️ Eliminando orden:', id);
     const { remove, ref } = await import('firebase/database');
     const ordenRef = ref(database, `ordenes/${id}`);
     
     await remove(ordenRef);
-    console.log('✅ Orden eliminada exitosamente');
   } catch (error: any) {
     console.error('❌ Error eliminando orden:', error);
     throw error;
@@ -612,7 +408,6 @@ export async function deleteOrden(id: string): Promise<void> {
 // Generar sugerencias de orden
 export async function generarSugerenciasOrden(proveedorId: string): Promise<any[]> {
   try {
-    console.log('🔍 Generando sugerencias para proveedor:', proveedorId);
     // Por ahora retornar array vacío - se puede implementar después
     return [];
   } catch (error: any) {
@@ -624,7 +419,6 @@ export async function generarSugerenciasOrden(proveedorId: string): Promise<any[
 // Obtener productos default de cliente
 export async function getProductosDefaultCliente(clienteId: string): Promise<any[]> {
   try {
-    console.log('🔍 Obteniendo productos default para cliente:', clienteId);
     // Por ahora retornar array vacío - se puede implementar después
     return [];
   } catch (error: any) {
@@ -633,19 +427,16 @@ export async function getProductosDefaultCliente(clienteId: string): Promise<any
   }
 }
 
-// Actualizar productos de orden en batch
-export async function updateProductosOrdenBatch(updates: any[]): Promise<void> {
+// Actualizar solo el campo 'orden' de productos en batch (nunca escribe otros campos para no pisar nombre, etc.)
+export async function updateProductosOrdenBatch(updates: { id: string; data: { orden?: number } }[]): Promise<void> {
   try {
-    console.log('🔄 Actualizando productos en batch:', updates.length);
     const { update, ref } = await import('firebase/database');
-    const updatesObj: any = {};
-    
-    updates.forEach(updateData => {
-      updatesObj[`productos/${updateData.id}`] = updateData.data;
-    });
-    
+    const updatesObj: Record<string, { orden: number }> = {};
+    for (const u of updates) {
+      const orden = typeof u.data?.orden === 'number' ? u.data.orden : 0;
+      updatesObj[`productos/${u.id}`] = { orden };
+    }
     await update(ref(database), updatesObj);
-    console.log('✅ Productos actualizados en batch exitosamente');
   } catch (error: any) {
     console.error('❌ Error actualizando productos en batch:', error);
     throw error;
@@ -657,7 +448,6 @@ export async function updateProductosOrdenBatch(updates: any[]): Promise<void> {
 // Guardar proveedor
 export async function saveProveedor(proveedorData: any): Promise<void> {
   try {
-    console.log('💾 Guardando proveedor:', proveedorData.nombre);
     const { set, ref } = await import('firebase/database');
     const proveedoresRef = ref(database, `proveedores/${Date.now()}`);
     
@@ -668,7 +458,6 @@ export async function saveProveedor(proveedorData: any): Promise<void> {
     };
     
     await set(proveedoresRef, proveedor);
-    console.log('✅ Proveedor guardado exitosamente');
   } catch (error: any) {
     console.error('❌ Error guardando proveedor:', error);
     throw error;
@@ -678,7 +467,6 @@ export async function saveProveedor(proveedorData: any): Promise<void> {
 // Actualizar proveedor
 export async function updateProveedor(id: string, updateData: any): Promise<void> {
   try {
-    console.log('🔄 Actualizando proveedor:', id);
     const { update, ref } = await import('firebase/database');
     const proveedorRef = ref(database, `proveedores/${id}`);
     
@@ -688,7 +476,6 @@ export async function updateProveedor(id: string, updateData: any): Promise<void
     };
     
     await update(proveedorRef, updateDataWithTimestamp);
-    console.log('✅ Proveedor actualizado exitosamente');
   } catch (error: any) {
     console.error('❌ Error actualizando proveedor:', error);
     throw error;
@@ -698,12 +485,10 @@ export async function updateProveedor(id: string, updateData: any): Promise<void
 // Eliminar proveedor
 export async function deleteProveedor(id: string): Promise<void> {
   try {
-    console.log('🗑️ Eliminando proveedor:', id);
     const { remove, ref } = await import('firebase/database');
     const proveedorRef = ref(database, `proveedores/${id}`);
     
     await remove(proveedorRef);
-    console.log('✅ Proveedor eliminado exitosamente');
   } catch (error: any) {
     console.error('❌ Error eliminando proveedor:', error);
     throw error;
@@ -713,7 +498,6 @@ export async function deleteProveedor(id: string): Promise<void> {
 // Actualizar productos default de cliente
 export async function updateProductosDefaultCliente(clienteId: string, productos: string[]): Promise<void> {
   try {
-    console.log('🔄 Actualizando productos default para cliente:', clienteId);
     const { update, ref } = await import('firebase/database');
     const clienteRef = ref(database, `proveedores/${clienteId}`);
     
@@ -721,7 +505,6 @@ export async function updateProductosDefaultCliente(clienteId: string, productos
       productosDefault: productos,
       updatedAt: new Date().toISOString()
     });
-    console.log('✅ Productos default actualizados exitosamente');
   } catch (error: any) {
     console.error('❌ Error actualizando productos default:', error);
     throw error;
@@ -755,17 +538,14 @@ export interface RecetaCosto {
 // Obtener receta de costo
 export async function getRecetaCosto(productoId: string): Promise<RecetaCosto | null> {
   try {
-    console.log('🔍 Obteniendo receta de costo para producto:', productoId);
     const { get, ref } = await import('firebase/database');
     const recetaRef = ref(database, `recetasCosto/${productoId}`);
     const snapshot = await get(recetaRef);
     
     if (snapshot.exists()) {
       const data = snapshot.val();
-      console.log('✅ Receta de costo obtenida');
       return { id: productoId, ...data };
     } else {
-      console.log('⚠️ No hay receta de costo para este producto');
       return null;
     }
   } catch (error: any) {
@@ -777,7 +557,6 @@ export async function getRecetaCosto(productoId: string): Promise<RecetaCosto | 
 // Guardar receta de costo
 export async function saveRecetaCosto(recetaData: RecetaCosto): Promise<void> {
   try {
-    console.log('💾 Guardando receta de costo:', recetaData.productoId);
     const { set, ref } = await import('firebase/database');
     const recetaRef = ref(database, `recetasCosto/${recetaData.productoId}`);
     
@@ -788,7 +567,6 @@ export async function saveRecetaCosto(recetaData: RecetaCosto): Promise<void> {
     };
     
     await set(recetaRef, receta);
-    console.log('✅ Receta de costo guardada exitosamente');
   } catch (error: any) {
     console.error('❌ Error guardando receta de costo:', error);
     throw error;
@@ -798,12 +576,10 @@ export async function saveRecetaCosto(recetaData: RecetaCosto): Promise<void> {
 // Eliminar receta de costo
 export async function deleteRecetaCosto(productoId: string): Promise<void> {
   try {
-    console.log('🗑️ Eliminando receta de costo:', productoId);
     const { remove, ref } = await import('firebase/database');
     const recetaRef = ref(database, `recetasCosto/${productoId}`);
     
     await remove(recetaRef);
-    console.log('✅ Receta de costo eliminada exitosamente');
   } catch (error: any) {
     console.error('❌ Error eliminando receta de costo:', error);
     throw error;
@@ -837,7 +613,6 @@ export const saveAuthState = async (isAuthenticated: boolean): Promise<void> => 
     };
     
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
-    console.log('💾 Estado de autenticación guardado:', isAuthenticated);
   } catch (error) {
     console.error('❌ Error guardando estado de autenticación:', error);
     throw error;
@@ -853,7 +628,6 @@ export const getAuthState = async (): Promise<boolean | null> => {
     const authDataString = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
     
     if (!authDataString) {
-      console.log('📱 No hay estado de autenticación guardado');
       return null;
     }
     
@@ -864,12 +638,10 @@ export const getAuthState = async (): Promise<boolean | null> => {
     const isExpired = Date.now() - authData.timestamp > thirtyDaysInMs;
     
     if (isExpired) {
-      console.log('⏰ Estado de autenticación expirado, limpiando...');
       await clearAuthState();
       return null;
     }
     
-    console.log('📱 Estado de autenticación restaurado:', authData.isAuthenticated);
     return authData.isAuthenticated;
   } catch (error) {
     console.error('❌ Error obteniendo estado de autenticación:', error);
@@ -884,7 +656,6 @@ export const getAuthState = async (): Promise<boolean | null> => {
 export const saveUserData = async (userData: User): Promise<void> => {
   try {
     await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
-    console.log('💾 Datos del usuario guardados:', userData.email);
   } catch (error) {
     console.error('❌ Error guardando datos del usuario:', error);
     throw error;
@@ -900,12 +671,10 @@ export const getUserData = async (): Promise<User | null> => {
     const userDataString = await AsyncStorage.getItem(USER_DATA_KEY);
     
     if (!userDataString) {
-      console.log('📱 No hay datos de usuario guardados');
       return null;
     }
     
     const userData: User = JSON.parse(userDataString);
-    console.log('📱 Datos del usuario restaurados:', userData.email);
     return userData;
   } catch (error) {
     console.error('❌ Error obteniendo datos del usuario:', error);
@@ -919,7 +688,6 @@ export const getUserData = async (): Promise<User | null> => {
 export const clearAuthState = async (): Promise<void> => {
   try {
     await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, USER_DATA_KEY]);
-    console.log('🧹 Estado de autenticación limpiado');
   } catch (error) {
     console.error('❌ Error limpiando estado de autenticación:', error);
     throw error;
@@ -936,12 +704,6 @@ export const hasValidSession = async (): Promise<boolean> => {
     const userData = await getUserData();
     
     const isValid = authState === true && userData !== null;
-    console.log('🔍 Verificación de sesión válida:', {
-      authState,
-      hasUserData: userData !== null,
-      isValid
-    });
-    
     return isValid;
   } catch (error) {
     console.error('❌ Error verificando sesión válida:', error);
@@ -995,19 +757,3 @@ export interface Proveedor {
   telefono?: string;
 }
 
-// Tipo Tarea
-export interface Tarea {
-  id: string;
-  titulo: string;
-  completada: boolean;
-  descripcion: string;
-  asignadaA: string;
-  usuarioAsignado: string;
-  prioridad: string;
-  publica: boolean;
-  seguidores: string[];
-  observacion: string;
-  createdAt: string;
-  updatedAt: string;
-  fechaCompletada?: string;
-}

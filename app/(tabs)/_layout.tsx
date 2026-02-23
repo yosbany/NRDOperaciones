@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RestrictedAccess from '../../components/RestrictedAccess';
 import { useUser } from '../../components/UserContext';
 import { Colors } from '../../constants/Colors';
 
@@ -14,18 +13,13 @@ export default function TabLayout() {
     const userContext = useUser();
     userData = userContext.userData;
   } catch (error) {
-    console.warn('⚠️ TabLayout: UserContext no disponible aún, esperando...');
     // Si el contexto no está disponible, mostrar loading o retornar null
     return null;
   }
 
-  // Si el usuario no tiene rol definido, mostrar pantalla de acceso restringido
-  if (userData && !userData.role) {
-    return <RestrictedAccess />;
-  }
-
   return (
     <Tabs
+      initialRouteName="ordenes"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#fff',
@@ -51,10 +45,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          href: null,
           title: 'Inicio',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
         }}
       />
       <Tabs.Screen
@@ -72,15 +64,6 @@ export default function TabLayout() {
           title: 'Productos',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cube" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="costos"
-        options={{
-          title: 'Costos',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calculator" size={size} color={color} />
           ),
         }}
       />

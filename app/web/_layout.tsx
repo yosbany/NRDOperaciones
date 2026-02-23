@@ -15,10 +15,8 @@ export default function WebLayout() {
         >
           <Stack.Screen name="index" />
           <Stack.Screen name="ordenes" />
-          <Stack.Screen name="tareas" />
           <Stack.Screen name="productos" />
           <Stack.Screen name="contactos" />
-          <Stack.Screen name="costos" />
         </Stack>
       </View>
     </AuthProvider>

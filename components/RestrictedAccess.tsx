@@ -11,13 +11,11 @@ export default function RestrictedAccess() {
 
   const handleLogout = async () => {
     try {
-      console.log('🔐 Cerrando sesión desde RestrictedAccess...');
       if (onLogout) {
         await onLogout();
       } else {
         await logout();
       }
-      console.log('✅ Sesión cerrada exitosamente');
     } catch (error) {
       console.error('❌ Error al cerrar sesión:', error);
     }

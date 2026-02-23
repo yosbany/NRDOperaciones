@@ -4,7 +4,7 @@
     "slug": "nrd-operaciones",
     "version": "1.0.32",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/nrd-logo.png",
     "scheme": "purchaseordersappexpo",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -25,7 +25,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/nrd-logo.png",
       "baseUrl": "/NRDOperaciones"
     },
     "plugins": [
@@ -33,8 +33,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/nrd-logo.png",
+          "imageWidth": 250,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
@@ -43,7 +43,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/nrd-logo.png",
           "color": "#D7263D",
           "sounds": [
             "./assets/notification_sound.wav"

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { getOrdenesByUserRole, getProductos, getProveedores, getTareasByUserRole } from '../../services/firebaseService';
+import { getOrdenesByUserRole, getProductos, getProveedores, isAdmin } from '../../services/firebaseService';
 // Interfaces simples para los modelos
 interface Orden {
   id: string;
@@ -34,26 +34,9 @@ interface Proveedor {
   updatedAt: string;
 }
 
-interface Tarea {
-  id: string;
-  titulo: string;
-  completada: boolean;
-  descripcion: string;
-  asignadaA: string;
-  usuarioAsignado: string;
-  prioridad: string;
-  publica: boolean;
-  seguidores: string[];
-  observacion: string;
-  createdAt: string;
-  updatedAt: string;
-  fechaCompletada?: string;
-}
-
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
-  const [tareas, setTareas] = useState<Tarea[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,16 +45,11 @@ const Dashboard: React.FC = () => {
     if (user) {
       const loadData = async () => {
         try {
-          // Cargar órdenes y tareas usando callbacks
           getOrdenesByUserRole(user, (ordenesData) => {
             setOrdenes(ordenesData);
           });
           
-          getTareasByUserRole(user, (tareasData) => {
-            setTareas(tareasData);
-          });
-          
-          if (user.role === 'ADMIN') {
+          if (isAdmin(user)) {
             getProveedores((proveedoresData) => {
               setProveedores(proveedoresData);
             });
@@ -108,7 +86,6 @@ const Dashboard: React.FC = () => {
   };
 
   const ordenesPendientes = ordenes.filter(orden => orden.estado === 'PENDIENTE');
-  const tareasPendientes = tareas.filter(tarea => !tarea.completada);
 
   if (Platform.OS === 'web') {
     return (
@@ -120,9 +97,9 @@ const Dashboard: React.FC = () => {
             <Text style={styles.webSubtitle}>
               Bienvenido, {user?.displayName || user?.username}
             </Text>
-            <View style={[styles.webBadge, { backgroundColor: user?.role === 'ADMIN' ? '#667eea' : '#28a745' }]}>
+            <View style={[styles.webBadge, { backgroundColor: isAdmin(user) ? '#667eea' : '#28a745' }]}>
               <Text style={styles.webBadgeText}>
-                {user?.role === 'ADMIN' ? 'Administrador' : 'Productor'}
+                {isAdmin(user) ? 'Administrador' : 'Usuario'}
               </Text>
             </View>
           </View>
@@ -140,14 +117,7 @@ const Dashboard: React.FC = () => {
             </Text>
           </View>
 
-          <View style={[styles.webStatCard, { borderLeftColor: '#28a745' }]}>
-            <Text style={styles.webStatTitle}>Tareas Pendientes</Text>
-            <Text style={[styles.webStatNumber, { color: '#28a745' }]}>
-              {tareasPendientes.length}
-            </Text>
-          </View>
-
-          {user?.role === 'ADMIN' && (
+          {isAdmin(user) && (
             <>
               <View style={[styles.webStatCard, { borderLeftColor: '#ffc107' }]}>
                 <Text style={styles.webStatTitle}>Proveedores</Text>
@@ -205,49 +175,6 @@ const Dashboard: React.FC = () => {
           </View>
         </View>
 
-        {/* Recent Tasks */}
-        <View style={styles.webCard}>
-          <View style={styles.webCardHeader}>
-            <Text style={styles.webCardTitle}>Tareas Recientes</Text>
-          </View>
-          <View style={styles.webCardContent}>
-            {tareasPendientes.length === 0 ? (
-              <Text style={styles.webEmptyText}>No hay tareas pendientes</Text>
-            ) : (
-              <View style={styles.webListContainer}>
-                {tareasPendientes.slice(0, 5).map(tarea => (
-                  <View key={tarea.id} style={styles.webListItem}>
-                    <View style={styles.webListItemContent}>
-                      <View>
-                        <Text style={styles.webListItemTitle}>
-                          {tarea.titulo}
-                        </Text>
-                        <Text style={styles.webListItemSubtitle}>
-                          {tarea.descripcion}
-                        </Text>
-                        <View style={styles.webBadgesContainer}>
-                          <View style={[styles.webPriorityBadge, { 
-                            backgroundColor: tarea.prioridad === 'alta' ? '#dc3545' : 
-                                           tarea.prioridad === 'media' ? '#ffc107' : '#28a745'
-                          }]}>
-                            <Text style={styles.webPriorityText}>
-                              {tarea.prioridad?.toUpperCase() || 'SIN PRIORIDAD'}
-                            </Text>
-                          </View>
-                          <View style={styles.webUserBadge}>
-                            <Text style={styles.webUserText}>
-                              {tarea.usuarioAsignado}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
       </ScrollView>
     );
   }
@@ -260,9 +187,9 @@ const Dashboard: React.FC = () => {
         <Text style={styles.mobileSubtitle}>
           Bienvenido, {user?.displayName || user?.username}
         </Text>
-        <View style={[styles.mobileBadge, { backgroundColor: user?.role === 'ADMIN' ? '#667eea' : '#28a745' }]}>
+        <View style={[styles.mobileBadge, { backgroundColor: isAdmin(user) ? '#667eea' : '#28a745' }]}>
           <Text style={styles.mobileBadgeText}>
-            {user?.role === 'ADMIN' ? 'Administrador' : 'Productor'}
+            {isAdmin(user) ? 'Administrador' : 'Usuario'}
           </Text>
         </View>
       </View>
@@ -275,12 +202,6 @@ const Dashboard: React.FC = () => {
           </Text>
         </View>
 
-        <View style={[styles.mobileStatCard, { borderLeftColor: '#28a745' }]}>
-          <Text style={styles.mobileStatTitle}>Tareas Pendientes</Text>
-          <Text style={[styles.mobileStatNumber, { color: '#28a745' }]}>
-            {tareasPendientes.length}
-          </Text>
-        </View>
       </View>
 
       <TouchableOpacity onPress={handleLogout} style={styles.mobileLogoutButton}>

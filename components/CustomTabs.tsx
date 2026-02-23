@@ -6,8 +6,6 @@ import { Colors } from '../constants/Colors';
 
 // Importar las pantallas directamente
 import ContactosScreen from '../app/(tabs)/contactos';
-import CostosScreen from '../app/(tabs)/costos';
-import InicioScreen from '../app/(tabs)/index';
 import OrdenesScreen from '../app/(tabs)/ordenes';
 import ProductosScreen from '../app/(tabs)/productos';
 
@@ -16,15 +14,13 @@ interface CustomTabsProps {
 }
 
 export default function CustomTabs({ userData }: CustomTabsProps) {
-  const [activeTab, setActiveTab] = useState('inicio');
+  const [activeTab, setActiveTab] = useState('ordenes');
   const insets = useSafeAreaInsets();
 
   const tabs = [
-    { id: 'inicio', title: 'Inicio', icon: 'home-outline', component: InicioScreen },
     { id: 'ordenes', title: 'Órdenes', icon: 'list-outline', component: OrdenesScreen },
     { id: 'productos', title: 'Productos', icon: 'cube-outline', component: ProductosScreen },
     { id: 'contactos', title: 'Contactos', icon: 'people-outline', component: ContactosScreen },
-    { id: 'costos', title: 'Costos', icon: 'calculator-outline', component: CostosScreen },
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;

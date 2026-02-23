@@ -31,8 +31,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Por ahora retornar null - se puede implementar después
-        const userData = null;
+          // Obtener datos del usuario desde Firebase
+          const userData = await getUserByUid(firebaseUser.uid);
           setUser(userData);
         } catch (error) {
           console.error('Error obteniendo datos del usuario:', error);

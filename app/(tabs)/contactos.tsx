@@ -2,54 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { useRouter } from 'expo-router'; // Removed to fix filename error
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
+import FormFooterButtons from '../../components/FormFooterButtons';
 import TabRestrictedAccess from '../../components/TabRestrictedAccess';
 import { useUser } from '../../components/UserContext';
+import { useLoading } from '../../contexts/LoadingContext';
 import { Colors } from '../../constants/Colors';
-import { canAccessTab, deleteProveedor, getOrdenes, getProductos, getProductosDefaultCliente, getProveedores, logEvento, Producto, Proveedor, saveProveedor, updateProductosDefaultCliente, updateProveedor } from '../../services/firebaseService';
+import { canAccessTab, deleteProveedor, getOrdenes, getProductos, getProductosDefaultCliente, getProveedores, Producto, Proveedor, saveProveedor, updateProductosDefaultCliente, updateProveedor } from '../../services/firebaseService';
 import { containsSearchTerm } from '../../utils/searchUtils';
 
 type ProveedorWithCelular = Proveedor & { celular?: string; tipo?: string; salarioPorDia?: number };
 
-function Header({ title, onBack, onAdd, showBackButton = true }: { 
-  title: string, 
-  onBack?: () => void,
-  onAdd?: () => void,
-  showBackButton?: boolean
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[
-      styles.header,
-      {
-        paddingTop: insets.top + 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-      },
-    ]}>
-      <StatusBar backgroundColor={Colors.tint} barStyle="light-content" />
-      {showBackButton && onBack ? (
-        <TouchableOpacity onPress={onBack} style={{ marginRight: 12 }}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-      ) : (
-        <View style={{ width: 40 }} />
-      )}
-      <Text style={styles.headerText}>{title}</Text>
-      {onAdd ? (
-        <TouchableOpacity onPress={onAdd} style={{ marginLeft: 12 }}>
-          <Ionicons name="add-circle" size={32} color="#fff" />
-        </TouchableOpacity>
-      ) : (
-        <View style={{ width: 40 }} />
-      )}
-    </View>
-  );
-}
 
 const FRECUENCIAS = [
   { label: 'Por Día', value: 'dia' },
@@ -68,21 +33,19 @@ function ProductosPredeterminadosView({
   productosDefault: Array<{ productoId: string; cantidad: string; unidad: string }>; 
   productos: Producto[] 
 }) {
-  console.log('🔄 ProductosPredeterminadosView renderizando');
-  console.log('📋 Productos predeterminados recibidos:', productosDefault.length);
-  console.log('📋 Detalle productos predeterminados:', productosDefault);
-  console.log('📦 Total productos disponibles:', productos.length);
-
   return (
     <View style={{ 
       borderWidth: 1, 
       borderColor: '#eee', 
       borderRadius: 6, 
       backgroundColor: '#f9f9f9',
-      minHeight: 100,
-      maxHeight: 200
+      height: 200
     }}>
-      <ScrollView style={{ padding: 8 }}>
+      <ScrollView 
+        style={{ padding: 8, flex: 1 }} 
+        nestedScrollEnabled={true}
+        showsVerticalScrollIndicator={true}
+      >
         {productosDefault.map(item => {
           const producto = productos.find(p => p.id === item.productoId);
           return (
@@ -153,10 +116,13 @@ function ProductosDirectosView({ proveedorId, productos }: { proveedorId: string
       borderColor: '#eee', 
       borderRadius: 6, 
       backgroundColor: '#f9f9f9',
-      minHeight: 100,
-      maxHeight: 200
+      height: 200
     }}>
-      <ScrollView style={{ padding: 8 }}>
+      <ScrollView 
+        style={{ padding: 8, flex: 1 }} 
+        nestedScrollEnabled={true}
+        showsVerticalScrollIndicator={true}
+      >
         {productosRelacionados.map(producto => (
           <View
             key={producto.id}
@@ -220,13 +186,8 @@ function ProductosDirectosView({ proveedorId, productos }: { proveedorId: string
 
 
 export default function ProveedoresScreen() {
-  const { userData } = useUser();
-  const insets = useSafeAreaInsets();
-
-  // Verificar si el usuario tiene permisos para acceder a contactos
-  if (!userData || !canAccessTab(userData, 'contactos')) {
-    return <TabRestrictedAccess tabName="contactos" />;
-  }
+  const { userData, onLogout } = useUser();
+  const { showLoading, hideLoading } = useLoading();
 
   // const router = useRouter(); // Removed to fix filename error
   const [showResumen, setShowResumen] = useState(false);
@@ -277,24 +238,16 @@ export default function ProveedoresScreen() {
 
   // Cargar productos predeterminados cuando se edita un cliente
   useEffect(() => {
-    console.log('🔄 useEffect productos predeterminados ejecutado');
-    console.log('📊 Estado actual:', { proveedorEditando, tipo });
-    
     const cargarProductosDefaultFormulario = async () => {
       if (proveedorEditando && tipo === 'Cliente') {
         try {
-          console.log('✅ Condiciones cumplidas, cargando productos predeterminados para:', proveedorEditando);
           const productosDefault = await getProductosDefaultCliente(proveedorEditando);
-          console.log('📋 Productos predeterminados obtenidos:', productosDefault.length);
-          console.log('📋 Detalle productos:', productosDefault);
           setProductosDefaultFormulario(productosDefault);
-          console.log('✅ Estado productosDefaultFormulario actualizado');
         } catch (error) {
           console.error('❌ Error cargando productos predeterminados para formulario:', error);
           setProductosDefaultFormulario([]);
         }
       } else {
-        console.log('🚫 Condiciones no cumplidas para cargar productos predeterminados');
         setProductosDefaultFormulario([]);
       }
     };
@@ -323,7 +276,6 @@ export default function ProveedoresScreen() {
       }
       
       setConteoProductosRelacionados(conteos);
-      console.log('📊 Conteo de productos relacionados calculado:', conteos);
     };
 
     if (proveedores.length > 0 && productos.length > 0) {
@@ -363,11 +315,7 @@ export default function ProveedoresScreen() {
 
   const getResponsableOrAlert = async () => {
     const responsable = (await AsyncStorage.getItem('responsableApp'))?.trim() || '';
-    if (!responsable) {
-      Alert.alert('Configuración requerida', 'Debe configurar el nombre del responsable en el engranaje de configuración antes de realizar esta acción.');
-      return null;
-    }
-    return responsable;
+    return responsable || 'App';
   };
 
   const calcularResumenContacto = (contacto: ProveedorWithCelular) => {
@@ -378,14 +326,6 @@ export default function ProveedoresScreen() {
       ? conteoProductosRelacionados[contacto.id] || 0  // Productos predeterminados
       : productos.filter((p: Producto) => p.proveedorId === contacto.id).length; // Productos directos
     
-    console.log('Analizando contacto:', { 
-      nombre: contacto.nombre, 
-      id: contacto.id, 
-      totalOrdenes: ordenesContacto.length,
-      totalProductos: totalProductos,
-      tipo: contacto.tipo
-    });
-    
     // Calcular valores de órdenes
     const valoresOrdenes = ordenesContacto.map((o: any) => {
       const total = (o.productos || []).reduce((sum: number, p: any) => {
@@ -394,17 +334,8 @@ export default function ProveedoresScreen() {
         const precio = productoInfo?.precio || 0;
         const cantidad = Number(p.cantidad) || 0;
         const subtotal = Number(precio) * cantidad;
-        console.log('Calculando producto:', { 
-          productoId: p.productoId, 
-          productoNombre: productoInfo?.nombre, 
-          precio, 
-          cantidad: p.cantidad, 
-          subtotal,
-          tienePrecio: productoInfo?.precio !== undefined && productoInfo?.precio !== null
-        });
         return sum + subtotal;
       }, 0);
-      console.log('Total de orden:', total, 'Productos en orden:', o.productos?.length || 0);
       return total;
     }).filter(valor => valor > 0);
 
@@ -428,7 +359,6 @@ export default function ProveedoresScreen() {
       }
     }
 
-    console.log('Resumen del contacto:', resumen);
     return resumen;
   };
 
@@ -440,18 +370,12 @@ export default function ProveedoresScreen() {
   // Función para abrir modal de productos predeterminados
   const abrirProductosDefault = async (cliente: ProveedorWithCelular) => {
     try {
-      console.log('🔄 Abriendo productos predeterminados para cliente:', cliente.nombre);
-      console.log('👤 Cliente ID:', cliente.id);
-      console.log('📦 Total productos en sistema:', productos.length);
-      
       // Preparar datos primero
       setClienteProductosDefault(cliente);
       setVolverAEditarContacto(true);
       
       // Cargar productos predeterminados
       const productosDefault = await getProductosDefaultCliente(cliente.id);
-      console.log('📋 Productos predeterminados cargados:', productosDefault.length);
-      console.log('📋 Productos predeterminados detalle:', productosDefault);
       setProductosDefault(productosDefault);
       
       // Transición suave: abrir modal de productos primero, luego cerrar edición
@@ -461,8 +385,6 @@ export default function ProveedoresScreen() {
       setTimeout(() => {
         setShowForm(false);
       }, 100);
-      
-      console.log('✅ Modal de productos predeterminados abierto');
     } catch (error) {
       console.error('❌ Error cargando productos predeterminados:', error);
       Alert.alert('Error', 'No se pudieron cargar los productos predeterminados');
@@ -472,26 +394,21 @@ export default function ProveedoresScreen() {
   // Función para guardar productos predeterminados
   const guardarProductosDefault = async () => {
     if (!clienteProductosDefault) return;
-    
     try {
+      showLoading();
       await updateProductosDefaultCliente(clienteProductosDefault.id, productosDefault);
-      
-      // Actualizar también el estado del formulario
       setProductosDefaultFormulario([...productosDefault]);
-      
-      // Actualizar el conteo en la lista de contactos
       setConteoProductosRelacionados(prev => ({
         ...prev,
         [clienteProductosDefault.id]: productosDefault.length
       }));
-      
-      console.log('✅ Estado del formulario y conteo actualizados con productos guardados');
-      
       Alert.alert('Éxito', 'Productos predeterminados guardados correctamente');
       cerrarModalProductosDefault();
     } catch (error) {
       console.error('Error guardando productos predeterminados:', error);
       Alert.alert('Error', 'No se pudieron guardar los productos predeterminados');
+    } finally {
+      hideLoading();
     }
   };
 
@@ -568,13 +485,6 @@ export default function ProveedoresScreen() {
       p.id?.toLowerCase().includes(filtroProductosDisponibles.toLowerCase())
     );
     
-    console.log('🔍 Filtrado de productos disponibles:');
-    console.log('📦 Total productos:', productos.length);
-    console.log('✅ Productos predeterminados:', productosDefault.length);
-    console.log('📋 Productos no seleccionados:', productosNoSeleccionados.length);
-    console.log('🔍 Productos filtrados:', productosFiltrados.length);
-    console.log('🔍 Filtro actual:', filtroProductosDisponibles);
-    
     return productosFiltrados;
   };
 
@@ -609,26 +519,20 @@ export default function ProveedoresScreen() {
       }
     }
     try {
+      showLoading();
       let id = proveedorEditando;
       if (proveedorEditando) {
-        // Obtener datos existentes del proveedor para preservar campos como productosDefault
         const proveedorExistente = proveedores.find(p => p.id === proveedorEditando);
-        
-        // Combinar datos existentes con nuevos datos
         const proveedorCompleto = {
-          ...proveedorExistente, // Preservar campos existentes
-          ...proveedorData,      // Aplicar cambios del formulario
+          ...proveedorExistente,
+          ...proveedorData,
           id: proveedorEditando,
           updatedAt: new Date().toISOString()
         };
-        
-        console.log('🔄 Actualizando proveedor con datos completos:', proveedorCompleto);
         await updateProveedor(proveedorEditando, proveedorCompleto as ProveedorWithCelular);
       } else {
         id = await saveProveedor(proveedorData as ProveedorWithCelular);
       }
-      // Registrar evento
-      await logEvento({ tipoEvento: proveedorEditando ? 'actualizacion_proveedor' : 'creacion_proveedor', responsable, idAfectado: (proveedorEditando || id || ''), datosJSON: proveedorData });
       setNombre('');
       setCelular('');
       setTipo('Proveedor');
@@ -641,6 +545,8 @@ export default function ProveedoresScreen() {
       setShowForm(false);
     } catch (e: any) {
       Alert.alert('Error', 'No se pudo guardar el proveedor: ' + (e?.message || e));
+    } finally {
+      hideLoading();
     }
   };
 
@@ -656,8 +562,13 @@ export default function ProveedoresScreen() {
       { text: 'Eliminar', style: 'destructive', onPress: async () => {
         const responsable = await getResponsableOrAlert();
         if (!responsable) return;
-        await deleteProveedor(id);
-        await logEvento({ tipoEvento: 'eliminacion_proveedor', responsable, idAfectado: id, datosJSON: {} });
+        try {
+          showLoading();
+          await deleteProveedor(id);
+          getProveedores((data) => setProveedores(data || []));
+        } finally {
+          hideLoading();
+        }
       }}
     ]);
   };
@@ -671,11 +582,19 @@ export default function ProveedoresScreen() {
     contactosFiltrados = contactosFiltrados.filter(p => containsSearchTerm(p.nombre, filtroNombre));
   }
 
+  if (userData && !canAccessTab(userData, 'contactos')) {
+    return <TabRestrictedAccess message="Solo usuarios del dominio @nrd.adm.com pueden acceder a Contactos." />;
+  }
+
   // --- Formulario ---
   if (showForm) {
     return (
       <View style={styles.safeArea}>
-        <Header title={proveedorEditando ? "Editar contacto" : "Nuevo contacto"} />
+        <AppHeader 
+          title={proveedorEditando ? "Editar contacto" : "Nuevo contacto"}
+          onBack={() => { setShowForm(false); setError(false); }}
+          actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
+        />
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           <Text style={styles.label}>Nombre <Text style={{ color: '#FF3B30' }}>*</Text></Text>
           <TextInput
@@ -998,9 +917,6 @@ export default function ProveedoresScreen() {
                 {tipo === 'Cliente' && (
                   <TouchableOpacity
                     onPress={() => {
-                      console.log('🔄 Botón Gestionar presionado');
-                      console.log('📊 Estado actual:', { proveedorEditando, tipo, nombre });
-                      
                       // Crear cliente con datos actuales del formulario
                       const clienteData: ProveedorWithCelular = {
                         id: proveedorEditando || 'temp-id',
@@ -1010,8 +926,6 @@ export default function ProveedoresScreen() {
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                       };
-                      
-                      console.log('📋 Datos del cliente preparados:', clienteData);
                       abrirProductosDefault(clienteData);
                     }}
                     style={{
@@ -1051,32 +965,21 @@ export default function ProveedoresScreen() {
           <View style={{ height: 80 }} />
         </ScrollView>
         {/* Footer fijo de acciones */}
-        <View style={styles.formFooterRow}>
-          <TouchableOpacity
-            style={[styles.formFooterBtn, styles.formFooterBtnSecondary]}
-            onPress={() => {
-              Alert.alert(
-                'Cancelar',
-                '¿Estás seguro de que deseas cancelar?',
-                [
-                  { text: 'No', style: 'cancel' },
-                  { text: 'Sí', onPress: () => { setShowForm(false); setError(false); } }
-                ]
-              );
-            }}
-          >
-            <Ionicons name="close" size={24} color="#D7263D" />
-            <Text style={styles.formFooterBtnTextSecondary}>Cancelar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.formFooterBtn, styles.formFooterBtnPrimary]}
-            onPress={agregarProveedor}
-            activeOpacity={0.8}
-          >
-            <Ionicons name={proveedorEditando ? 'create-outline' : 'add-circle'} size={22} color="#fff" />
-            <Text style={styles.formFooterBtnText}>{proveedorEditando ? 'Actualizar' : 'Crear'}</Text>
-          </TouchableOpacity>
-        </View>
+        <FormFooterButtons
+          onCancel={() => {
+            Alert.alert(
+              'Cancelar',
+              '¿Estás seguro de que deseas cancelar?',
+              [
+                { text: 'No', style: 'cancel' },
+                { text: 'Sí', onPress: () => { setShowForm(false); setError(false); } }
+              ]
+            );
+          }}
+          onSave={agregarProveedor}
+          saveText={proveedorEditando ? 'Actualizar' : 'Crear'}
+          saveIcon={proveedorEditando ? 'create-outline' : 'add-circle'}
+        />
       </View>
     );
   }
@@ -1087,13 +990,14 @@ export default function ProveedoresScreen() {
     
     return (
       <View style={styles.safeArea}>
-        <Header 
+        <AppHeader 
           title="Resumen del Contacto" 
           onBack={() => {
             setShowResumen(false);
             setContactoResumen(null);
           }}
           showBackButton={true}
+          actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
         />
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           {/* Información básica */}
@@ -1220,19 +1124,10 @@ export default function ProveedoresScreen() {
   // --- Vista principal: Listado de contactos ---
   return (
     <View style={styles.safeArea}>
-      <Header 
+      <AppHeader 
         title={`Contactos (${contactosFiltrados.length})`} 
         showBackButton={false}
-        onAdd={() => {
-          setNombre('');
-          setFrecuenciaTipo('');
-          setFrecuenciaValor('');
-          setFrecuenciaExtra('');
-          setFrecuenciaExtra2('');
-          setProveedorEditando(null);
-          setError(false);
-          setShowForm(true);
-        }} 
+        actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
       />
       <View style={styles.container}>
         <View style={styles.segmentedContainer}>
@@ -1296,6 +1191,10 @@ export default function ProveedoresScreen() {
           data={contactosFiltrados}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 100 }}
+          initialNumToRender={14}
+          maxToRenderPerBatch={10}
+          windowSize={6}
+          removeClippedSubviews={true}
           renderItem={({ item }: { item: ProveedorWithCelular }) => (
             <Swipeable
               ref={ref => { if (ref) swipeableRefs.current[item.id] = ref; }}
@@ -1412,6 +1311,39 @@ export default function ProveedoresScreen() {
             </Swipeable>
           )}
         />
+        {/* Botón flotante nuevo contacto */}
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 20,
+            right: 20,
+            backgroundColor: '#D7263D',
+            borderRadius: 30,
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+            zIndex: 1000
+          }}
+          onPress={() => {
+            setNombre('');
+            setFrecuenciaTipo('');
+            setFrecuenciaValor('');
+            setFrecuenciaExtra('');
+            setFrecuenciaExtra2('');
+            setProveedorEditando(null);
+            setError(false);
+            setShowForm(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       {/* Modal de Productos Predeterminados */}
@@ -1421,25 +1353,12 @@ export default function ProveedoresScreen() {
         onRequestClose={cerrarModalProductosDefault}
       >
         <View style={styles.safeArea}>
-          {/* Header personalizado con botón volver */}
-          <View style={[
-            styles.header,
-            {
-              paddingTop: insets.top + 8,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 18,
-            },
-          ]}>
-            <StatusBar backgroundColor={Colors.tint} barStyle="light-content" />
-            <TouchableOpacity onPress={cerrarModalProductosDefault} style={{ marginRight: 12 }}>
-              <Ionicons name="arrow-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Text style={[styles.headerText, { flex: 1, textAlign: 'center', marginRight: 36 }]}>
-              Productos de Cliente
-            </Text>
-          </View>
+          <AppHeader 
+            title="Productos de Cliente"
+            onBack={cerrarModalProductosDefault}
+            showBackButton={true}
+            actions={[{ icon: 'log-out-outline', onPress: () => onLogout(), size: 28 }]}
+          />
           <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             <Text style={[styles.label, { marginBottom: 4 }]}>Cliente: {clienteProductosDefault?.nombre}</Text>
 
@@ -1569,24 +1488,12 @@ export default function ProveedoresScreen() {
           </ScrollView>
           
           {/* Footer fijo de acciones */}
-          <View style={styles.formFooterRow}>
-            <TouchableOpacity
-              style={[styles.formFooterBtn, styles.formFooterBtnSecondary]}
-              onPress={cerrarModalProductosDefault}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={24} color="#D7263D" />
-              <Text style={styles.formFooterBtnTextSecondary}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.formFooterBtn, styles.formFooterBtnPrimary]}
-              onPress={guardarProductosDefault}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="save-outline" size={22} color="#fff" />
-              <Text style={styles.formFooterBtnText}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
+          <FormFooterButtons
+            onCancel={cerrarModalProductosDefault}
+            onSave={guardarProductosDefault}
+            saveText="Guardar"
+            saveIcon="save-outline"
+          />
         </View>
       </Modal>
     </View>
@@ -1641,31 +1548,78 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   formFooterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    minWidth: 100,
+    flex: 0,
+    minWidth: 40,
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
   },
   formFooterBtnPrimary: {
     backgroundColor: '#D7263D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   formFooterBtnSecondary: {
-    backgroundColor: '#f8f8f8',
+    flex: 0,
+    minWidth: 40,
+    backgroundColor: 'transparent',
   },
   formFooterBtnText: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
     color: '#fff',
-    marginLeft: 8,
+    flexShrink: 0,
+    flex: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    numberOfLines: 1,
+    width: 'auto',
+    maxWidth: 'none',
+    lineHeight: 16,
+    alignSelf: 'flex-start',
   },
   formFooterBtnTextSecondary: {
     color: '#D7263D',
     fontWeight: 'bold',
-    fontSize: 16,
-    marginLeft: 8,
+    fontSize: 14,
+    flexShrink: 0,
+    flex: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    numberOfLines: 1,
+    width: 'auto',
+    maxWidth: 'none',
+    lineHeight: 16,
+    alignSelf: 'flex-start',
+  },
+  formFooterBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    maxWidth: 'none',
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  formFooterBtnIcon: {
+    flexShrink: 0,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: 'auto',
+    alignSelf: 'flex-start',
   },
   errorText: { color: '#FF3B30', marginBottom: 8, marginTop: 8, fontWeight: 'bold', fontSize: 15, textAlign: 'center' },
   itemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8f8f8', padding: 10, borderRadius: 4, marginBottom: 2, minHeight: 80, borderWidth: 2, borderColor: 'transparent' },
