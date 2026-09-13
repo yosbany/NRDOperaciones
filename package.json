@@ -10,8 +10,10 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist && touch dist/.nojekyll",
-    "deploy:web": "node scripts/deploy-github-pages.js",
-    "deploy:web:old": "npm run build:web && node scripts/copy-dist-to-root.js && node scripts/fix-github-pages-paths.js"
+    "guard:ta01-deploy": "node scripts/guard-ta01-deployment.js",
+    "test:ta01-deploy-guard": "node scripts/guard-ta01-deployment.test.js",
+    "deploy:web": "node scripts/guard-ta01-deployment.js && node scripts/deploy-github-pages.js",
+    "deploy:web:old": "node scripts/guard-ta01-deployment.js && npm run build:web && node scripts/copy-dist-to-root.js && node scripts/fix-github-pages-paths.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "^6.1.2",

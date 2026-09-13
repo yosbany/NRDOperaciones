@@ -3,10 +3,14 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { assertDeploymentAllowed } = require('./guard-ta01-deployment');
 
 console.log('🚀 Desplegando a GitHub Pages con corrección de iconos...');
 
 try {
+  // Governance guard: fail closed until TA-01 cutover is explicitly completed.
+  assertDeploymentAllowed();
+
   // 1. Limpiar build anterior
   console.log('🧹 Limpiando build anterior...');
   if (fs.existsSync('dist')) {
