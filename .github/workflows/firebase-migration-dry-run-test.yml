@@ -1,0 +1,28 @@
+name: Firebase migration dry-run tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/firebase-migration-dry-run.js'
+      - 'scripts/firebase-migration-dry-run.test.js'
+      - '.github/workflows/firebase-migration-dry-run-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run-analyzer-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run fail-closed analyzer tests
+        run: node scripts/firebase-migration-dry-run.test.js
