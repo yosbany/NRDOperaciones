@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('assert');
+const {analyze}=require('./firebase-migration-dry-run');
+const base={users:{u1:{email:'redacted@example.test'}},proveedores:{s1:{nombre:'Supplier'}},productos:{p1:{nombre:'Product',precio:10}},ordenes:{o1:{proveedorId:'s1',status:'pending',total:20,createdAt:'2026-09-15T10:00:00-03:00',items:[{productoId:'p1',quantity:2,price:10}]}},recetasCosto:{p1:{costo:5}}};
+const valid=analyze(base); assert.equal(valid.mode,'DRY_RUN'); assert.equal(valid.writeCapability,'DISABLED'); assert.equal(valid.roots.recetasCosto.disposition,'HOLD'); assert.equal(valid.orderSimulation[0].keyStrategy,'PRESERVE_SOURCE_KEY'); assert(valid.executionGates.every(g=>g.status==='UNRESOLVED')); assert.equal(analyze(base).reportChecksum,valid.reportChecksum);
+const same=analyze(base,{purchaseOrders:{o1:{}}},{collisionEvidence:{'ordenes/o1':'SAME_ENTITY'},authInventoriesProvided:true,targetIdentities:{}}); assert.equal(same.orderSimulation[0].collisionClass,'SAME_ENTITY'); assert.equal(same.orderSimulation[0].keyStrategy,'PRESERVE_SOURCE_KEY'); assert.equal(same.identityPreflight[0].classification,'PRESERVE_UID');
+const different=analyze(base,{purchaseOrders:{o1:{}}},{collisionEvidence:{'ordenes/o1':'DIFFERENT_ENTITY'}}); assert.equal(different.orderSimulation[0].keyStrategy,'REKEY_WITH_MAPPING_TABLE_REQUIRED'); assert(different.blockers.some(b=>b.code==='REKEY_WITH_MAPPING_TABLE_REQUIRED'));
+const unknown=analyze(base,{purchaseOrders:{o1:{}}}); assert.equal(unknown.orderSimulation[0].collisionClass,'UNKNOWN'); assert.equal(unknown.orderSimulation[0].keyStrategy,'BLOCKED');
+const sameEmail=analyze(base,{}, {authInventoriesProvided:true,targetIdentities:{u2:{email:'REDACTED@example.test'}}}); assert.equal(sameEmail.identityPreflight[0].classification,'REQUIRES_RECONCILIATION');
+const proven=analyze(base,{}, {authInventoriesProvided:true,targetIdentities:{u2:{email:'redacted@example.test'}},identityProofs:{u1:'u2'}}); assert.equal(proven.identityPreflight[0].classification,'MATCH_EXISTING');
+const noAuth=analyze(base); assert.equal(noAuth.identityPreflight[0].classification,'BLOCKED/UNKNOWN');
+const missing=JSON.parse(JSON.stringify(base)); delete missing.ordenes.o1.status; delete missing.ordenes.o1.total; delete missing.ordenes.o1.items[0].price; const mr=analyze(missing); assert(mr.blockers.some(b=>b.code==='MISSING_STATUS')); assert(mr.blockers.some(b=>b.code==='MISSING_OR_INVALID_TOTAL')); assert(mr.blockers.some(b=>b.code.includes('MISSING_OR_INVALID_PRICE')));
+const unexpected=analyze({...base,mystery:{x:1}}); assert.deepEqual(unexpected.unexpectedRoots,['mystery']);
+const analyzer=require('./firebase-migration-dry-run'); assert.deepEqual(Object.keys(analyzer).sort(),['analyze','checksum','summary']);
+console.log('firebase-migration-dry-run tests: PASS');
